@@ -6,25 +6,25 @@ import { Text, View } from "@/components/Themed";
 import { useColorScheme } from "@/components/useColorScheme";
 import Colors from "@/constants/Colors";
 
-export default function ProductsScreen() {
+export default function CategoriesScreen() {
   const colorScheme = useColorScheme() ?? "light";
   const tint = Colors[colorScheme].tint;
 
   return (
     <View style={styles.container}>
-      <FontAwesome name="cube" size={48} color={tint} style={styles.icon} />
-      <Text style={styles.title}>Products</Text>
+      <FontAwesome name="th-large" size={48} color={tint} style={styles.icon} />
+      <Text style={styles.title}>Categories</Text>
       <Text style={styles.subtitle}>
-        No products yet. Add your first product!
+        No categories yet. Add your first category!
       </Text>
 
       <TouchableOpacity
         activeOpacity={0.7}
         style={[styles.button, { backgroundColor: tint }]}
-        onPress={() => router.push("/add-product")}
+        onPress={() => router.push("/add-category")}
       >
         <FontAwesome name="plus" size={16} color="#fff" />
-        <RNText style={styles.buttonText}>Add Product</RNText>
+        <RNText style={styles.buttonText}>Add Category</RNText>
       </TouchableOpacity>
     </View>
   );
