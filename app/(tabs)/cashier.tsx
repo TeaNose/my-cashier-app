@@ -14,6 +14,12 @@ import { Text, View } from '@/components/Themed';
 import { useTheme } from '@/hooks/useTheme';
 import { getProducts, type Product } from '@/db/products';
 import { type CartItem } from '@/db/transactions';
+import { t } from '@/i18n';
+
+let _shouldClearCart = false;
+export function requestCartClear() {
+  _shouldClearCart = true;
+}
 
 export default function CashierScreen() {
   const { tint, background, inputBackground, inputBorder, text } = useTheme();
@@ -28,6 +34,12 @@ export default function CashierScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      if (_shouldClearCart) {
+        setCart([]);
+        setSearch('');
+        setHasSearched(false);
+        _shouldClearCart = false;
+      }
       getProducts().then((all) =>
         setAllProducts(all.filter((p) => p.is_active === 1)),
       );
@@ -81,12 +93,16 @@ export default function CashierScreen() {
     });
   };
 
+  const deleteFromCart = (productId: number) => {
+    setCart((prev) => prev.filter((c) => c.product_id !== productId));
+  };
+
   const getCartQty = (productId: number) =>
     cart.find((c) => c.product_id === productId)?.qty ?? 0;
 
   const handleCheckout = () => {
     if (cart.length === 0) {
-      Alert.alert('Empty Cart', 'Add products to the cart first.');
+      Alert.alert(t('cashier.empty_cart'), t('cashier.empty_cart_msg'));
       return;
     }
     router.push({
@@ -97,9 +113,9 @@ export default function CashierScreen() {
 
   const clearCart = () => {
     if (cart.length === 0) return;
-    Alert.alert('Clear Cart', 'Remove all items from cart?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Clear', style: 'destructive', onPress: () => setCart([]) },
+    Alert.alert(t('cashier.clear_cart'), t('cashier.clear_cart_msg'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('common.clear'), style: 'destructive', onPress: () => setCart([]) },
     ]);
   };
 
@@ -107,7 +123,7 @@ export default function CashierScreen() {
     if (!permission?.granted) {
       const result = await requestPermission();
       if (!result.granted) {
-        Alert.alert('Permission Required', 'Camera access is needed to scan barcodes.');
+        Alert.alert(t('cashier.permission_required'), t('cashier.camera_permission'));
         return;
       }
     }
@@ -129,9 +145,9 @@ export default function CashierScreen() {
 
     if (found) {
       addToCart(found);
-      Alert.alert('Added', `"${found.name}" added to cart.`);
+      Alert.alert(t('cashier.added'), t('cashier.added_msg', { name: found.name }));
     } else {
-      Alert.alert('Not Found', `No product with SKU "${data}".`);
+      Alert.alert(t('cashier.not_found'), t('cashier.not_found_msg', { code: data }));
     }
 
     setTimeout(() => {
@@ -158,7 +174,7 @@ export default function CashierScreen() {
             {formatPrice(item.sell_price)}
           </Text>
           {item.stock_qty > 0 && (
-            <Text style={styles.stockLabel}>Stock: {item.stock_qty}</Text>
+            <Text style={styles.stockLabel}>{t('cashier.stock')}: {item.stock_qty}</Text>
           )}
         </TouchableOpacity>
         {qty > 0 ? (
@@ -200,7 +216,7 @@ export default function CashierScreen() {
         />
         <View style={styles.scanOverlay}>
           <View style={styles.scanFrame} />
-          <Text style={styles.scanHint}>Point camera at barcode or QR code</Text>
+          <Text style={styles.scanHint}>{t('cashier.point_camera')}</Text>
         </View>
         <TouchableOpacity
           style={styles.scanCloseBtn}
@@ -222,7 +238,7 @@ export default function CashierScreen() {
           <FontAwesome name="search" size={14} color={text} style={{ opacity: 0.4 }} />
           <TextInput
             style={[styles.searchInput, { color: text }]}
-            placeholder="Search by name or SKU..."
+            placeholder={t('cashier.search_placeholder')}
             placeholderTextColor={text + '60'}
             value={search}
             onChangeText={handleSearchChange}
@@ -246,14 +262,14 @@ export default function CashierScreen() {
       {!hasSearched && cart.length === 0 ? (
         <View style={styles.emptyContainer}>
           <FontAwesome name="search" size={40} color={tint} style={{ opacity: 0.3 }} />
-          <Text style={styles.emptyTitle}>Search or Scan</Text>
+          <Text style={styles.emptyTitle}>{t('cashier.search_or_scan')}</Text>
           <Text style={styles.emptyText}>
-            Search for a product by name/SKU or scan a barcode to get started.
+            {t('cashier.search_hint')}
           </Text>
         </View>
       ) : !hasSearched && cart.length > 0 ? (
         <View style={styles.cartOnlyContainer}>
-          <Text style={styles.cartSectionTitle}>Cart ({cartCount} items)</Text>
+          <Text style={styles.cartSectionTitle}>{t('cashier.cart_title', { count: cartCount })}</Text>
           <FlatList
             data={cart}
             keyExtractor={(item) => item.product_id.toString()}
@@ -261,6 +277,12 @@ export default function CashierScreen() {
             showsVerticalScrollIndicator={false}
             renderItem={({ item }) => (
               <View style={[styles.productCard, { borderColor: inputBorder }]}>
+                <TouchableOpacity
+                  style={styles.deleteBtn}
+                  onPress={() => deleteFromCart(item.product_id)}
+                >
+                  <FontAwesome name="trash-o" size={16} color="#FF3B30" />
+                </TouchableOpacity>
                 <View style={styles.productInfo}>
                   <Text style={styles.productName} numberOfLines={1}>
                     {item.product_name}
@@ -294,7 +316,7 @@ export default function CashierScreen() {
       ) : searchResults.length === 0 ? (
         <View style={styles.emptyContainer}>
           <FontAwesome name="search" size={40} color={tint} style={{ opacity: 0.3 }} />
-          <Text style={styles.emptyText}>No products match "{search}"</Text>
+          <Text style={styles.emptyText}>{t('cashier.no_match', { query: search })}</Text>
         </View>
       ) : (
         <FlatList
@@ -314,7 +336,7 @@ export default function CashierScreen() {
               <FontAwesome name="trash-o" size={16} color="#FF3B30" />
             </TouchableOpacity>
             <View>
-              <Text style={styles.cartCount}>{cartCount} item{cartCount > 1 ? 's' : ''}</Text>
+              <Text style={styles.cartCount}>{cartCount} {t('cashier.items_suffix')}</Text>
               <Text style={[styles.cartTotal, { color: tint }]}>{formatPrice(cartTotal)}</Text>
             </View>
           </View>
@@ -324,7 +346,7 @@ export default function CashierScreen() {
             onPress={handleCheckout}
           >
             <FontAwesome name="arrow-right" size={16} color="#fff" />
-            <Text style={styles.checkoutText}>Checkout</Text>
+            <Text style={styles.checkoutText}>{t('cashier.checkout')}</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -438,6 +460,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     minWidth: 20,
     textAlign: 'center',
+  },
+  deleteBtn: {
+    padding: 6,
+    marginRight: 8,
   },
   addBtn: {
     width: 36,

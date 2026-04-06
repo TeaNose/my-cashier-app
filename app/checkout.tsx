@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import {
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
   Alert,
   TextInput,
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { router, useLocalSearchParams } from 'expo-router';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 
@@ -13,6 +13,8 @@ import { Text, View } from '@/components/Themed';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { useTheme } from '@/hooks/useTheme';
 import { createTransaction, type CartItem } from '@/db/transactions';
+import { requestCartClear } from './(tabs)/cashier';
+import { t } from '@/i18n';
 
 const QUICK_AMOUNTS = [1000, 2000, 5000, 10000, 20000, 50000, 100000];
 
@@ -42,7 +44,7 @@ export default function CheckoutScreen() {
 
   const handlePay = async () => {
     if (!isSufficient) {
-      Alert.alert('Insufficient', 'Amount paid is less than total.');
+      Alert.alert(t('checkout.insufficient'), t('checkout.insufficient_msg'));
       return;
     }
 
@@ -57,7 +59,7 @@ export default function CheckoutScreen() {
       setChangeAmount(transaction.change_amount);
       setCompleted(true);
     } catch (error) {
-      Alert.alert('Error', 'Failed to save transaction.');
+      Alert.alert(t('common.error'), t('checkout.save_failed'));
     } finally {
       setSaving(false);
     }
@@ -67,14 +69,14 @@ export default function CheckoutScreen() {
     return (
       <View style={[styles.container, styles.centered, { backgroundColor: background }]}>
         <FontAwesome name="check-circle" size={64} color="#34C759" />
-        <Text style={styles.successTitle}>Payment Successful!</Text>
-        <Text style={[styles.totalLabel, { marginTop: 16 }]}>Total</Text>
+        <Text style={styles.successTitle}>{t('checkout.success_title')}</Text>
+        <Text style={[styles.totalLabel, { marginTop: 16 }]}>{t('checkout.total')}</Text>
         <Text style={[styles.totalValue, { color: tint }]}>{formatPrice(total)}</Text>
-        <Text style={styles.totalLabel}>Paid</Text>
+        <Text style={styles.totalLabel}>{t('checkout.paid')}</Text>
         <Text style={styles.paidValue}>{formatPrice(paidNum)}</Text>
         {changeAmount > 0 && (
           <>
-            <Text style={styles.totalLabel}>Change</Text>
+            <Text style={styles.totalLabel}>{t('checkout.change')}</Text>
             <Text style={[styles.changeValue, { color: '#FF9500' }]}>
               {formatPrice(changeAmount)}
             </Text>
@@ -82,22 +84,27 @@ export default function CheckoutScreen() {
         )}
         <TouchableOpacity
           style={[styles.doneBtn, { backgroundColor: tint }]}
-          onPress={() => router.dismissAll()}
+          onPress={() => {
+            requestCartClear();
+            router.dismissAll();
+          }}
         >
-          <Text style={styles.doneBtnText}>Back to Cashier</Text>
+          <Text style={styles.doneBtnText}>{t('checkout.back_to_cashier')}</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
   return (
-    <ScrollView
+    <KeyboardAwareScrollView
       style={[styles.scrollView, { backgroundColor: background }]}
       contentContainerStyle={styles.container}
       keyboardShouldPersistTaps="handled"
+      extraScrollHeight={120}
+      enableOnAndroid={true}
     >
       {/* Order Summary */}
-      <Text style={styles.sectionTitle}>Order Summary</Text>
+      <Text style={styles.sectionTitle}>{t('checkout.order_summary')}</Text>
       <View style={[styles.summaryCard, { borderColor: inputBorder }]}>
         {cart.map((item) => (
           <View key={item.product_id} style={styles.summaryRow}>
@@ -116,14 +123,14 @@ export default function CheckoutScreen() {
         ))}
         <View style={[styles.divider, { backgroundColor: inputBorder }]} />
         <View style={styles.summaryRow}>
-          <Text style={styles.totalLabelBold}>Total</Text>
+          <Text style={styles.totalLabelBold}>{t('checkout.total')}</Text>
           <Text style={[styles.totalBold, { color: tint }]}>{formatPrice(total)}</Text>
         </View>
       </View>
 
       {/* Payment */}
-      <Text style={styles.sectionTitle}>Payment</Text>
-      <Text style={styles.inputLabel}>Amount Paid</Text>
+      <Text style={styles.sectionTitle}>{t('checkout.payment')}</Text>
+      <Text style={styles.inputLabel}>{t('checkout.amount_paid')}</Text>
       <TextInput
         style={[
           styles.amountInput,
@@ -146,7 +153,7 @@ export default function CheckoutScreen() {
           style={[styles.quickBtn, { backgroundColor: '#34C759' }]}
           onPress={() => setAmountPaid(String(total))}
         >
-          <Text style={styles.quickBtnText}>Exact</Text>
+          <Text style={styles.quickBtnText}>{t('checkout.exact')}</Text>
         </TouchableOpacity>
         {QUICK_AMOUNTS.filter((a) => a >= total * 0.1).slice(0, 4).map((amount) => (
           <TouchableOpacity
@@ -163,7 +170,7 @@ export default function CheckoutScreen() {
 
       {paidNum > 0 && isSufficient && (
         <View style={[styles.changeBox, { backgroundColor: '#FF950020' }]}>
-          <Text style={styles.changeLabel}>Change</Text>
+          <Text style={styles.changeLabel}>{t('checkout.change')}</Text>
           <Text style={[styles.changeAmount, { color: '#FF9500' }]}>
             {formatPrice(paidNum - total)}
           </Text>
@@ -171,7 +178,7 @@ export default function CheckoutScreen() {
       )}
 
       {/* Notes */}
-      <Text style={[styles.inputLabel, { marginTop: 16 }]}>Notes (optional)</Text>
+      <Text style={[styles.inputLabel, { marginTop: 16 }]}>{t('checkout.notes_label')}</Text>
       <TextInput
         style={[
           styles.notesInput,
@@ -179,16 +186,16 @@ export default function CheckoutScreen() {
         ]}
         value={notes}
         onChangeText={setNotes}
-        placeholder="e.g. Table 5, customer name..."
+        placeholder={t('checkout.notes_placeholder')}
         placeholderTextColor={text + '40'}
         multiline
       />
 
       <PrimaryButton
-        label={saving ? 'Processing...' : `Pay ${formatPrice(total)}`}
+        label={saving ? t('common.processing') : t('checkout.pay', { amount: formatPrice(total) })}
         onPress={handlePay}
       />
-    </ScrollView>
+    </KeyboardAwareScrollView>
   );
 }
 

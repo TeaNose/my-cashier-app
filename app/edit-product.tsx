@@ -6,9 +6,10 @@ import {
   TouchableOpacity,
   Modal,
   FlatList,
+  ActivityIndicator,
 } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 
@@ -17,12 +18,14 @@ import { FormInput } from '@/components/FormInput';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { useTheme } from '@/hooks/useTheme';
 import { getCategories, type Category } from '@/db/categories';
-import { createProduct } from '@/db/products';
+import { getProductById, updateProduct } from '@/db/products';
 import { t } from '@/i18n';
 
-export default function AddProductScreen() {
+export default function EditProductScreen() {
   const { tint, background } = useTheme();
+  const { id } = useLocalSearchParams<{ id: string }>();
 
+  const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
   const [sku, setSku] = useState('');
   const [barcode, setBarcode] = useState('');
@@ -41,8 +44,31 @@ export default function AddProductScreen() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    getCategories().then(setCategories);
-  }, []);
+    const load = async () => {
+      const [cats, product] = await Promise.all([
+        getCategories(),
+        getProductById(Number(id)),
+      ]);
+      setCategories(cats);
+      if (product) {
+        setName(product.name);
+        setSku(product.sku || '');
+        setBarcode(product.barcode || '');
+        setBuyPrice(product.buy_price ? String(product.buy_price) : '');
+        setSellPrice(String(product.sell_price));
+        setStockQty(String(product.stock_qty));
+        setMinStockAlert(String(product.min_stock_alert));
+        setUnit(product.unit || '');
+        setIsActive(product.is_active === 1);
+        if (product.category_id) {
+          const cat = cats.find((c) => c.id === product.category_id);
+          if (cat) setSelectedCategory(cat);
+        }
+      }
+      setLoading(false);
+    };
+    load();
+  }, [id]);
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -56,7 +82,7 @@ export default function AddProductScreen() {
 
     setSaving(true);
     try {
-      await createProduct({
+      await updateProduct(Number(id), {
         name: name.trim(),
         sku: sku.trim() || undefined,
         barcode: barcode.trim() || undefined,
@@ -68,15 +94,23 @@ export default function AddProductScreen() {
         min_stock_alert: Number(minStockAlert) || 0,
         is_active: isActive,
       });
-      Alert.alert(t('common.success'), t('products.created', { name }), [
+      Alert.alert(t('common.success'), t('products.updated', { name }), [
         { text: t('common.ok'), onPress: () => router.back() },
       ]);
     } catch (error) {
-      Alert.alert(t('common.error'), `${t('products.save_failed')} ${t('common.try_again')}`);
+      Alert.alert(t('common.error'), `${t('products.update_failed')} ${t('common.try_again')}`);
     } finally {
       setSaving(false);
     }
   };
+
+  if (loading) {
+    return (
+      <View style={[styles.loadingContainer, { backgroundColor: background }]}>
+        <ActivityIndicator size="large" color={tint} />
+      </View>
+    );
+  }
 
   return (
     <KeyboardAwareScrollView
@@ -242,7 +276,7 @@ export default function AddProductScreen() {
         <Switch value={isActive} onValueChange={setIsActive} trackColor={{ true: tint }} />
       </View>
 
-      <PrimaryButton label={saving ? t('common.saving') : t('products.save_product')} onPress={handleSave} />
+      <PrimaryButton label={saving ? t('common.saving') : t('products.update_product')} onPress={handleSave} />
 
       {/* Barcode Scanner Modal */}
       <Modal visible={scanning} animationType="slide">
@@ -275,6 +309,11 @@ export default function AddProductScreen() {
 }
 
 const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   scrollView: {
     flex: 1,
   },

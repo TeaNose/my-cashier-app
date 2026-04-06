@@ -9,6 +9,7 @@ import { Text, View } from '@/components/Themed';
 import { EmptyState } from '@/components/EmptyState';
 import { useTheme } from '@/hooks/useTheme';
 import { getCategories, deleteCategory, type Category } from '@/db/categories';
+import { t } from '@/i18n';
 
 export default function CategoriesScreen() {
   const { tint } = useTheme();
@@ -26,10 +27,10 @@ export default function CategoriesScreen() {
   );
 
   const handleDelete = (category: Category) => {
-    Alert.alert('Delete', `Delete "${category.name}"?`, [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('common.delete'), t('categories.delete_confirm', { name: category.name }), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Delete',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: async () => {
           await deleteCategory(category.id);
@@ -43,9 +44,9 @@ export default function CategoriesScreen() {
     return (
       <EmptyState
         icon="th-large"
-        title="Categories"
-        subtitle="No categories yet. Add your first category!"
-        buttonLabel="Add Category"
+        title={t('categories.title')}
+        subtitle={t('categories.empty_subtitle')}
+        buttonLabel={t('categories.add_button')}
         onPress={() => router.push('/add-category')}
       />
     );

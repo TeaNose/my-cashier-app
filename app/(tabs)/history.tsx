@@ -1,16 +1,18 @@
 import { useState, useCallback } from 'react';
-import { StyleSheet, FlatList, TouchableOpacity, Modal } from 'react-native';
+import { StyleSheet, FlatList, TouchableOpacity, Modal, Platform } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 import { Text, View } from '@/components/Themed';
 import { useTheme } from '@/hooks/useTheme';
 import {
-  getTransactions,
+  getTransactionsByDate,
   getTransactionWithItems,
   type Transaction,
   type TransactionWithItems,
 } from '@/db/transactions';
+import { t } from '@/i18n';
 
 export default function HistoryScreen() {
   const { tint, background, inputBorder } = useTheme();
@@ -18,19 +20,47 @@ export default function HistoryScreen() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [selected, setSelected] = useState<TransactionWithItems | null>(null);
   const [showDetail, setShowDetail] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
+  const loadTransactions = useCallback((date: Date) => {
+    getTransactionsByDate(date).then(setTransactions);
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
-      getTransactions().then(setTransactions);
-    }, []),
+      loadTransactions(selectedDate);
+    }, [loadTransactions, selectedDate]),
   );
+
+  const totalForDay = transactions.reduce((sum, t) => sum + t.total, 0);
+
+  const formatDayLabel = (d: Date) => {
+    const today = new Date();
+    const isToday =
+      d.getFullYear() === today.getFullYear() &&
+      d.getMonth() === today.getMonth() &&
+      d.getDate() === today.getDate();
+    const label = d.toLocaleDateString('id-ID', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+    return isToday ? `${t('history.today')}, ${label}` : label;
+  };
+
+  const onDateChange = (_event: any, date?: Date) => {
+    if (Platform.OS !== 'ios') setShowDatePicker(false);
+    if (date) setSelectedDate(date);
+  };
 
   const formatPrice = (price: number) =>
     price.toLocaleString('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 });
 
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr + 'Z');
-    return d.toLocaleDateString('id-ID', {
+    return d.toLocaleString('id-ID', {
       day: 'numeric',
       month: 'short',
       year: 'numeric',
@@ -73,10 +103,37 @@ export default function HistoryScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: background }]}>
+      {/* Date Filter Header */}
+      <View style={[styles.dateHeader, { borderBottomColor: inputBorder }]}>
+        <TouchableOpacity
+          style={[styles.dateBtn, { borderColor: inputBorder }]}
+          activeOpacity={0.7}
+          onPress={() => setShowDatePicker(true)}
+        >
+          <FontAwesome name="calendar" size={16} color={tint} />
+          <Text style={styles.dateBtnText}>{formatDayLabel(selectedDate)}</Text>
+          <FontAwesome name="caret-down" size={14} color={tint} />
+        </TouchableOpacity>
+        <View style={styles.dayTotalRow}>
+          <Text style={styles.dayTotalLabel}>{t('history.tx_count', { count: transactions.length })}</Text>
+          <Text style={[styles.dayTotalValue, { color: tint }]}>{formatPrice(totalForDay)}</Text>
+        </View>
+      </View>
+
+      {showDatePicker && (
+        <DateTimePicker
+          value={selectedDate}
+          mode="date"
+          display={Platform.OS === 'ios' ? 'inline' : 'default'}
+          maximumDate={new Date()}
+          onChange={onDateChange}
+        />
+      )}
+
       {transactions.length === 0 ? (
         <View style={styles.emptyContainer}>
           <FontAwesome name="history" size={40} color={tint} style={{ opacity: 0.5 }} />
-          <Text style={styles.emptyText}>No transactions yet.</Text>
+          <Text style={styles.emptyText}>{t('history.empty_on_date')}</Text>
         </View>
       ) : (
         <FlatList
@@ -98,7 +155,7 @@ export default function HistoryScreen() {
           <View style={styles.modalContent}>
             {selected && (
               <>
-                <Text style={styles.modalTitle}>Transaction #{selected.id}</Text>
+                <Text style={styles.modalTitle}>{t('history.transaction')} #{selected.id}</Text>
                 <Text style={styles.modalDate}>{formatDate(selected.created_at)}</Text>
 
                 <View style={[styles.divider, { backgroundColor: inputBorder }]} />
@@ -118,25 +175,25 @@ export default function HistoryScreen() {
                 <View style={[styles.divider, { backgroundColor: inputBorder }]} />
 
                 <View style={styles.detailRow}>
-                  <Text style={styles.detailBoldLabel}>Total</Text>
+                  <Text style={styles.detailBoldLabel}>{t('history.total')}</Text>
                   <Text style={[styles.detailBoldValue, { color: tint }]}>
                     {formatPrice(selected.total)}
                   </Text>
                 </View>
                 <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Paid</Text>
+                  <Text style={styles.detailLabel}>{t('history.paid')}</Text>
                   <Text style={styles.detailValue}>{formatPrice(selected.amount_paid)}</Text>
                 </View>
                 {selected.change_amount > 0 && (
                   <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Change</Text>
+                    <Text style={styles.detailLabel}>{t('history.change')}</Text>
                     <Text style={[styles.detailValue, { color: '#FF9500' }]}>
                       {formatPrice(selected.change_amount)}
                     </Text>
                   </View>
                 )}
                 {selected.notes ? (
-                  <Text style={styles.notesText}>Notes: {selected.notes}</Text>
+                  <Text style={styles.notesText}>{t('history.notes_label')}: {selected.notes}</Text>
                 ) : null}
               </>
             )}
@@ -150,6 +207,39 @@ export default function HistoryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  dateHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    gap: 12,
+  },
+  dateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  dateBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  dayTotalRow: {
+    alignItems: 'flex-end',
+  },
+  dayTotalLabel: {
+    fontSize: 11,
+    opacity: 0.6,
+  },
+  dayTotalValue: {
+    fontSize: 16,
+    fontWeight: '800',
   },
   emptyContainer: {
     flex: 1,

@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "my-cashier-app",
+    "name": "My Cashier App",
     "slug": "my-cashier-app",
     "owner": "teanose",
     "version": "1.0.0",
@@ -33,7 +33,20 @@
     },
     "plugins": [
       "expo-router",
-      "expo-sqlite"
+      "expo-sqlite",
+      "@react-native-community/datetimepicker",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff",
+          "dark": {
+            "backgroundColor": "#1c1c1e"
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

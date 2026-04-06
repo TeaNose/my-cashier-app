@@ -7,6 +7,7 @@ import { FormInput } from '@/components/FormInput';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { useTheme } from '@/hooks/useTheme';
 import { createCategory } from '@/db/categories';
+import { t } from '@/i18n';
 
 export default function AddCategoryScreen() {
   const { background } = useTheme();
@@ -17,18 +18,18 @@ export default function AddCategoryScreen() {
 
   const handleSave = async () => {
     if (!name.trim()) {
-      Alert.alert('Validation', 'Category name is required.');
+      Alert.alert(t('common.validation'), t('categories.name_required'));
       return;
     }
 
     setSaving(true);
     try {
       await createCategory(name, description);
-      Alert.alert('Success', `Category "${name}" created.`, [
-        { text: 'OK', onPress: () => router.back() },
+      Alert.alert(t('common.success'), t('categories.created', { name }), [
+        { text: t('common.ok'), onPress: () => router.back() },
       ]);
     } catch (error) {
-      Alert.alert('Error', 'Failed to save category. Please try again.');
+      Alert.alert(t('common.error'), `${t('categories.save_failed')} ${t('common.try_again')}`);
     } finally {
       setSaving(false);
     }
@@ -42,21 +43,21 @@ export default function AddCategoryScreen() {
     >
       <View style={styles.section}>
         <FormInput
-          label="Name *"
+          label={t('categories.name')}
           value={name}
           onChangeText={setName}
-          placeholder="e.g. Beverages"
+          placeholder={t('categories.name_placeholder')}
         />
         <FormInput
-          label="Description"
+          label={t('categories.description')}
           value={description}
           onChangeText={setDescription}
-          placeholder="Optional description"
+          placeholder={t('categories.description_placeholder')}
           multiline
         />
       </View>
 
-      <PrimaryButton label={saving ? 'Saving...' : 'Save Category'} onPress={handleSave} />
+      <PrimaryButton label={saving ? t('common.saving') : t('categories.save_category')} onPress={handleSave} />
     </ScrollView>
   );
 }

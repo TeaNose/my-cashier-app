@@ -3,9 +3,12 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useColorScheme } from 'react-native';
 import 'react-native-reanimated';
+
+import { SplashOverlay } from '@/components/SplashOverlay';
+import { t } from '@/i18n';
 
 export { ErrorBoundary } from 'expo-router';
 
@@ -20,6 +23,7 @@ export default function RootLayout() {
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
     ...FontAwesome.font,
   });
+  const [splashDone, setSplashDone] = useState(false);
 
   useEffect(() => {
     if (error) throw error;
@@ -35,7 +39,12 @@ export default function RootLayout() {
     return null;
   }
 
-  return <RootLayoutNav />;
+  return (
+    <>
+      <RootLayoutNav />
+      {!splashDone && <SplashOverlay onFinish={() => setSplashDone(true)} />}
+    </>
+  );
 }
 
 function RootLayoutNav() {
@@ -45,9 +54,10 @@ function RootLayoutNav() {
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="add-product" options={{ title: 'Add Product' }} />
-        <Stack.Screen name="add-category" options={{ title: 'Add Category' }} />
-        <Stack.Screen name="checkout" options={{ title: 'Checkout' }} />
+        <Stack.Screen name="add-product" options={{ title: t('stack.add_product') }} />
+        <Stack.Screen name="edit-product" options={{ title: t('stack.edit_product') }} />
+        <Stack.Screen name="add-category" options={{ title: t('stack.add_category') }} />
+        <Stack.Screen name="checkout" options={{ title: t('stack.checkout') }} />
       </Stack>
     </ThemeProvider>
   );

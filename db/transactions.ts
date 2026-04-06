@@ -87,6 +87,21 @@ export async function getTransactions(): Promise<Transaction[]> {
   );
 }
 
+export async function getTransactionsByDate(date: Date): Promise<Transaction[]> {
+  const db = await getDatabase();
+  // Build local-day [start, end) range, then convert to UTC ISO strings
+  // because created_at is stored in UTC by SQLite's CURRENT_TIMESTAMP.
+  const start = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const end = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
+  const toSqlUtc = (d: Date) =>
+    d.toISOString().slice(0, 19).replace('T', ' ');
+  return db.getAllAsync<Transaction>(
+    'SELECT * FROM transactions WHERE created_at >= ? AND created_at < ? ORDER BY created_at DESC',
+    toSqlUtc(start),
+    toSqlUtc(end),
+  );
+}
+
 export async function getTransactionWithItems(id: number): Promise<TransactionWithItems | null> {
   const db = await getDatabase();
   const transaction = await db.getFirstAsync<Transaction>(
