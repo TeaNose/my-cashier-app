@@ -1,81 +1,62 @@
 import { useState } from 'react';
-import {
-  StyleSheet,
-  TextInput,
-  Pressable,
-  ScrollView,
-  Alert,
-  useColorScheme,
-} from 'react-native';
+import { StyleSheet, ScrollView, Alert } from 'react-native';
 import { router } from 'expo-router';
 
-import { Text, View } from '@/components/Themed';
-import Colors from '@/constants/Colors';
+import { View } from '@/components/Themed';
+import { FormInput } from '@/components/FormInput';
+import { PrimaryButton } from '@/components/PrimaryButton';
+import { useTheme } from '@/hooks/useTheme';
+import { createCategory } from '@/db/categories';
 
 export default function AddCategoryScreen() {
-  const colorScheme = useColorScheme() ?? 'light';
-  const tint = Colors[colorScheme].tint;
-  const textColor = Colors[colorScheme].text;
-  const inputBg = colorScheme === 'dark' ? '#1c1c1e' : '#f2f2f7';
-  const borderColor = colorScheme === 'dark' ? '#38383a' : '#c6c6c8';
+  const { background } = useTheme();
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [saving, setSaving] = useState(false);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!name.trim()) {
       Alert.alert('Validation', 'Category name is required.');
       return;
     }
 
-    // TODO: Save to database
-    Alert.alert('Success', `Category "${name}" created.`, [
-      { text: 'OK', onPress: () => router.back() },
-    ]);
+    setSaving(true);
+    try {
+      await createCategory(name, description);
+      Alert.alert('Success', `Category "${name}" created.`, [
+        { text: 'OK', onPress: () => router.back() },
+      ]);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to save category. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
     <ScrollView
-      style={[styles.scrollView, { backgroundColor: Colors[colorScheme].background }]}
+      style={[styles.scrollView, { backgroundColor: background }]}
       contentContainerStyle={styles.container}
       keyboardShouldPersistTaps="handled"
     >
       <View style={styles.section}>
-        <Text style={styles.label}>Name *</Text>
-        <TextInput
-          style={[styles.input, { backgroundColor: inputBg, borderColor, color: textColor }]}
+        <FormInput
+          label="Name *"
           value={name}
           onChangeText={setName}
           placeholder="e.g. Beverages"
-          placeholderTextColor="#999"
         />
-
-        <Text style={styles.label}>Description</Text>
-        <TextInput
-          style={[
-            styles.input,
-            styles.textArea,
-            { backgroundColor: inputBg, borderColor, color: textColor },
-          ]}
+        <FormInput
+          label="Description"
           value={description}
           onChangeText={setDescription}
           placeholder="Optional description"
-          placeholderTextColor="#999"
           multiline
-          numberOfLines={4}
-          textAlignVertical="top"
         />
       </View>
 
-      <Pressable
-        style={({ pressed }) => [
-          styles.button,
-          { backgroundColor: tint, opacity: pressed ? 0.8 : 1 },
-        ]}
-        onPress={handleSave}
-      >
-        <Text style={styles.buttonText}>Save Category</Text>
-      </Pressable>
+      <PrimaryButton label={saving ? 'Saving...' : 'Save Category'} onPress={handleSave} />
     </ScrollView>
   );
 }
@@ -89,31 +70,5 @@ const styles = StyleSheet.create({
   },
   section: {
     marginBottom: 24,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 6,
-    marginTop: 16,
-  },
-  input: {
-    borderWidth: 1,
-    borderRadius: 10,
-    padding: 12,
-    fontSize: 16,
-  },
-  textArea: {
-    minHeight: 100,
-  },
-  button: {
-    borderRadius: 10,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '700',
   },
 });

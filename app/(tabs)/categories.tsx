@@ -1,30 +1,83 @@
-import FontAwesome from "@expo/vector-icons/FontAwesome";
-import { router } from "expo-router";
-import { Text as RNText, StyleSheet, TouchableOpacity } from "react-native";
+import { useCallback, useState } from 'react';
+import { FlatList, StyleSheet, Alert } from 'react-native';
+import { router } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
+import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { TouchableOpacity } from 'react-native';
 
-import { Text, View } from "@/components/Themed";
-import { useColorScheme } from "@/components/useColorScheme";
-import Colors from "@/constants/Colors";
+import { Text, View } from '@/components/Themed';
+import { EmptyState } from '@/components/EmptyState';
+import { useTheme } from '@/hooks/useTheme';
+import { getCategories, deleteCategory, type Category } from '@/db/categories';
 
 export default function CategoriesScreen() {
-  const colorScheme = useColorScheme() ?? "light";
-  const tint = Colors[colorScheme].tint;
+  const { tint } = useTheme();
+  const [categories, setCategories] = useState<Category[]>([]);
+
+  const loadCategories = useCallback(async () => {
+    const data = await getCategories();
+    setCategories(data);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadCategories();
+    }, [loadCategories]),
+  );
+
+  const handleDelete = (category: Category) => {
+    Alert.alert('Delete', `Delete "${category.name}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          await deleteCategory(category.id);
+          loadCategories();
+        },
+      },
+    ]);
+  };
+
+  if (categories.length === 0) {
+    return (
+      <EmptyState
+        icon="th-large"
+        title="Categories"
+        subtitle="No categories yet. Add your first category!"
+        buttonLabel="Add Category"
+        onPress={() => router.push('/add-category')}
+      />
+    );
+  }
 
   return (
     <View style={styles.container}>
-      <FontAwesome name="th-large" size={48} color={tint} style={styles.icon} />
-      <Text style={styles.title}>Categories</Text>
-      <Text style={styles.subtitle}>
-        No categories yet. Add your first category!
-      </Text>
-
+      <FlatList
+        data={categories}
+        keyExtractor={(item) => String(item.id)}
+        contentContainerStyle={styles.list}
+        renderItem={({ item }) => (
+          <View style={styles.row}>
+            <View style={styles.rowContent}>
+              <Text style={styles.name}>{item.name}</Text>
+              {item.description ? (
+                <Text style={styles.description}>{item.description}</Text>
+              ) : null}
+            </View>
+            <TouchableOpacity onPress={() => handleDelete(item)} hitSlop={8}>
+              <FontAwesome name="trash-o" size={20} color="#ff3b30" />
+            </TouchableOpacity>
+          </View>
+        )}
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
+      />
       <TouchableOpacity
         activeOpacity={0.7}
-        style={[styles.button, { backgroundColor: tint }]}
-        onPress={() => router.push("/add-category")}
+        style={[styles.fab, { backgroundColor: tint }]}
+        onPress={() => router.push('/add-category')}
       >
-        <FontAwesome name="plus" size={16} color="#fff" />
-        <RNText style={styles.buttonText}>Add Category</RNText>
+        <FontAwesome name="plus" size={24} color="#fff" />
       </TouchableOpacity>
     </View>
   );
@@ -33,34 +86,45 @@ export default function CategoriesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 20,
   },
-  icon: {
-    marginBottom: 16,
+  list: {
+    padding: 16,
   },
-  title: {
-    fontSize: 22,
-    fontWeight: "bold",
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 4,
   },
-  subtitle: {
-    fontSize: 14,
-    opacity: 0.6,
-    marginTop: 8,
-    marginBottom: 28,
+  rowContent: {
+    flex: 1,
   },
-  button: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    borderRadius: 10,
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-  },
-  buttonText: {
-    color: "#fff",
+  name: {
     fontSize: 16,
-    fontWeight: "700",
+    fontWeight: '600',
+  },
+  description: {
+    fontSize: 13,
+    opacity: 0.6,
+    marginTop: 2,
+  },
+  separator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: '#c6c6c8',
+  },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
   },
 });

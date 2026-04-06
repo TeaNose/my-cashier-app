@@ -1,38 +1,49 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet,
-  TextInput,
-  Pressable,
   ScrollView,
   Switch,
   Alert,
-  useColorScheme,
+  TouchableOpacity,
+  Modal,
+  FlatList,
 } from 'react-native';
 import { router } from 'expo-router';
+import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 
 import { Text, View } from '@/components/Themed';
-import Colors from '@/constants/Colors';
+import { FormInput } from '@/components/FormInput';
+import { PrimaryButton } from '@/components/PrimaryButton';
+import { useTheme } from '@/hooks/useTheme';
+import { getCategories, type Category } from '@/db/categories';
+import { createProduct } from '@/db/products';
 
 export default function AddProductScreen() {
-  const colorScheme = useColorScheme() ?? 'light';
-  const tint = Colors[colorScheme].tint;
-  const textColor = Colors[colorScheme].text;
-  const inputBg = colorScheme === 'dark' ? '#1c1c1e' : '#f2f2f7';
-  const borderColor = colorScheme === 'dark' ? '#38383a' : '#c6c6c8';
+  const { tint, background } = useTheme();
 
   const [name, setName] = useState('');
   const [sku, setSku] = useState('');
+  const [barcode, setBarcode] = useState('');
+  const [scanning, setScanning] = useState(false);
+  const [permission, requestPermission] = useCameraPermissions();
+  const scanCooldown = useRef(false);
   const [buyPrice, setBuyPrice] = useState('');
   const [sellPrice, setSellPrice] = useState('');
   const [stockQty, setStockQty] = useState('');
   const [minStockAlert, setMinStockAlert] = useState('');
   const [unit, setUnit] = useState('');
   const [isActive, setIsActive] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  // TODO: Replace with actual categories from database
-  const [categoryId, setCategoryId] = useState('');
+  useEffect(() => {
+    getCategories().then(setCategories);
+  }, []);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!name.trim()) {
       Alert.alert('Validation', 'Product name is required.');
       return;
@@ -42,82 +53,163 @@ export default function AddProductScreen() {
       return;
     }
 
-    // TODO: Save to database
-    Alert.alert('Success', `Product "${name}" created.`, [
-      { text: 'OK', onPress: () => router.back() },
-    ]);
+    setSaving(true);
+    try {
+      await createProduct({
+        name: name.trim(),
+        sku: sku.trim() || undefined,
+        barcode: barcode.trim() || undefined,
+        category_id: selectedCategory?.id ?? null,
+        unit: unit.trim() || undefined,
+        buy_price: Number(buyPrice) || 0,
+        sell_price: Number(sellPrice),
+        stock_qty: Number(stockQty) || 0,
+        min_stock_alert: Number(minStockAlert) || 0,
+        is_active: isActive,
+      });
+      Alert.alert('Success', `Product "${name}" created.`, [
+        { text: 'OK', onPress: () => router.back() },
+      ]);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to save product. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   };
-
-  const inputStyle = [styles.input, { backgroundColor: inputBg, borderColor, color: textColor }];
 
   return (
     <ScrollView
-      style={[styles.scrollView, { backgroundColor: Colors[colorScheme].background }]}
+      style={[styles.scrollView, { backgroundColor: background }]}
       contentContainerStyle={styles.container}
       keyboardShouldPersistTaps="handled"
     >
       {/* Basic Info */}
       <Text style={styles.sectionTitle}>Basic Information</Text>
       <View style={styles.section}>
-        <Text style={styles.label}>Product Name *</Text>
-        <TextInput
-          style={inputStyle}
+        <FormInput
+          label="Product Name *"
           value={name}
           onChangeText={setName}
           placeholder="e.g. Coca Cola 330ml"
-          placeholderTextColor="#999"
         />
-
-        <Text style={styles.label}>SKU</Text>
-        <TextInput
-          style={inputStyle}
+        <FormInput
+          label="SKU"
           value={sku}
           onChangeText={setSku}
           placeholder="e.g. BEV-CC-330"
-          placeholderTextColor="#999"
           autoCapitalize="characters"
         />
 
-        <Text style={styles.label}>Category</Text>
-        <TextInput
-          style={inputStyle}
-          value={categoryId}
-          onChangeText={setCategoryId}
-          placeholder="Category ID (picker coming soon)"
-          placeholderTextColor="#999"
-          keyboardType="number-pad"
-        />
+        {/* Barcode */}
+        <Text style={styles.inputLabel}>Barcode / QR Code</Text>
+        <View style={styles.barcodeRow}>
+          <View style={styles.barcodeInputWrapper}>
+            <FormInput
+              value={barcode}
+              onChangeText={setBarcode}
+              placeholder="Scan or type barcode"
+            />
+          </View>
+          <TouchableOpacity
+            style={[styles.scanBtn, { backgroundColor: tint }]}
+            onPress={async () => {
+              if (!permission?.granted) {
+                const result = await requestPermission();
+                if (!result.granted) {
+                  Alert.alert('Permission Required', 'Camera access is needed to scan barcodes.');
+                  return;
+                }
+              }
+              setScanning(true);
+            }}
+          >
+            <FontAwesome name="qrcode" size={20} color="#fff" />
+          </TouchableOpacity>
+        </View>
 
-        <Text style={styles.label}>Unit</Text>
-        <TextInput
-          style={inputStyle}
+        {/* Category Dropdown */}
+        <Text style={styles.inputLabel}>Category</Text>
+        <TouchableOpacity
+          style={[styles.dropdown, { borderColor: tint + '40' }]}
+          onPress={() => setShowCategoryPicker(true)}
+        >
+          <Text style={[styles.dropdownText, !selectedCategory && styles.dropdownPlaceholder]}>
+            {selectedCategory ? selectedCategory.name : 'Select a category'}
+          </Text>
+          <Text style={styles.dropdownArrow}>▼</Text>
+        </TouchableOpacity>
+
+        <Modal visible={showCategoryPicker} transparent animationType="fade">
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setShowCategoryPicker(false)}
+          >
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Select Category</Text>
+              {categories.length === 0 ? (
+                <Text style={styles.emptyText}>No categories yet. Add one first.</Text>
+              ) : (
+                <FlatList
+                  data={categories}
+                  keyExtractor={(item) => item.id.toString()}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      style={[
+                        styles.optionRow,
+                        selectedCategory?.id === item.id && { backgroundColor: tint + '20' },
+                      ]}
+                      onPress={() => {
+                        setSelectedCategory(item);
+                        setShowCategoryPicker(false);
+                      }}
+                    >
+                      <Text style={styles.optionText}>{item.name}</Text>
+                      {selectedCategory?.id === item.id && (
+                        <Text style={[styles.checkMark, { color: tint }]}>✓</Text>
+                      )}
+                    </TouchableOpacity>
+                  )}
+                />
+              )}
+              {selectedCategory && (
+                <TouchableOpacity
+                  style={styles.clearButton}
+                  onPress={() => {
+                    setSelectedCategory(null);
+                    setShowCategoryPicker(false);
+                  }}
+                >
+                  <Text style={styles.clearButtonText}>Clear Selection</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </TouchableOpacity>
+        </Modal>
+
+        <FormInput
+          label="Unit"
           value={unit}
           onChangeText={setUnit}
           placeholder="e.g. pcs, kg, liter"
-          placeholderTextColor="#999"
         />
       </View>
 
       {/* Pricing */}
       <Text style={styles.sectionTitle}>Pricing</Text>
       <View style={styles.section}>
-        <Text style={styles.label}>Buy Price</Text>
-        <TextInput
-          style={inputStyle}
+        <FormInput
+          label="Buy Price"
           value={buyPrice}
           onChangeText={setBuyPrice}
           placeholder="0"
-          placeholderTextColor="#999"
           keyboardType="decimal-pad"
         />
-
-        <Text style={styles.label}>Sell Price *</Text>
-        <TextInput
-          style={inputStyle}
+        <FormInput
+          label="Sell Price *"
           value={sellPrice}
           onChangeText={setSellPrice}
           placeholder="0"
-          placeholderTextColor="#999"
           keyboardType="decimal-pad"
         />
       </View>
@@ -125,46 +217,56 @@ export default function AddProductScreen() {
       {/* Stock */}
       <Text style={styles.sectionTitle}>Stock</Text>
       <View style={styles.section}>
-        <Text style={styles.label}>Stock Quantity</Text>
-        <TextInput
-          style={inputStyle}
+        <FormInput
+          label="Stock Quantity"
           value={stockQty}
           onChangeText={setStockQty}
           placeholder="0"
-          placeholderTextColor="#999"
           keyboardType="number-pad"
         />
-
-        <Text style={styles.label}>Minimum Stock Alert</Text>
-        <TextInput
-          style={inputStyle}
+        <FormInput
+          label="Minimum Stock Alert"
           value={minStockAlert}
           onChangeText={setMinStockAlert}
           placeholder="0"
-          placeholderTextColor="#999"
           keyboardType="number-pad"
         />
       </View>
 
       {/* Status */}
       <View style={styles.switchRow}>
-        <Text style={styles.label}>Active</Text>
-        <Switch
-          value={isActive}
-          onValueChange={setIsActive}
-          trackColor={{ true: tint }}
-        />
+        <Text style={styles.switchLabel}>Active</Text>
+        <Switch value={isActive} onValueChange={setIsActive} trackColor={{ true: tint }} />
       </View>
 
-      <Pressable
-        style={({ pressed }) => [
-          styles.button,
-          { backgroundColor: tint, opacity: pressed ? 0.8 : 1 },
-        ]}
-        onPress={handleSave}
-      >
-        <Text style={styles.buttonText}>Save Product</Text>
-      </Pressable>
+      <PrimaryButton label={saving ? 'Saving...' : 'Save Product'} onPress={handleSave} />
+
+      {/* Barcode Scanner Modal */}
+      <Modal visible={scanning} animationType="slide">
+        <View style={styles.scannerContainer}>
+          <CameraView
+            style={styles.camera}
+            barcodeScannerSettings={{ barcodeTypes: ['qr', 'ean13', 'ean8', 'code128', 'code39'] }}
+            onBarcodeScanned={({ data }) => {
+              if (scanCooldown.current) return;
+              scanCooldown.current = true;
+              setBarcode(data);
+              setScanning(false);
+              setTimeout(() => { scanCooldown.current = false; }, 1500);
+            }}
+          />
+          <View style={styles.scanOverlay}>
+            <View style={styles.scanFrame} />
+            <Text style={styles.scanHint}>Point camera at barcode or QR code</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.scanCloseBtn}
+            onPress={() => setScanning(false)}
+          >
+            <FontAwesome name="times" size={24} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -186,17 +288,135 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: 8,
   },
-  label: {
+  inputLabel: {
     fontSize: 14,
     fontWeight: '600',
+    marginTop: 12,
     marginBottom: 6,
-    marginTop: 16,
   },
-  input: {
+  dropdown: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     borderWidth: 1,
     borderRadius: 10,
-    padding: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    marginBottom: 4,
+  },
+  dropdownText: {
+    fontSize: 15,
+    flex: 1,
+  },
+  dropdownPlaceholder: {
+    opacity: 0.4,
+  },
+  dropdownArrow: {
+    fontSize: 10,
+    opacity: 0.5,
+    marginLeft: 8,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    paddingHorizontal: 30,
+  },
+  modalContent: {
+    borderRadius: 14,
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    maxHeight: 400,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  emptyText: {
+    textAlign: 'center',
+    opacity: 0.5,
+    paddingVertical: 20,
+  },
+  optionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  optionText: {
     fontSize: 16,
+  },
+  checkMark: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  clearButton: {
+    marginTop: 12,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  clearButtonText: {
+    fontSize: 14,
+    color: '#FF3B30',
+    fontWeight: '600',
+  },
+  barcodeRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 8,
+  },
+  barcodeInputWrapper: {
+    flex: 1,
+  },
+  scanBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 0,
+  },
+  scannerContainer: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  camera: {
+    flex: 1,
+  },
+  scanOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+  scanFrame: {
+    width: 250,
+    height: 250,
+    borderWidth: 2,
+    borderColor: '#fff',
+    borderRadius: 16,
+    backgroundColor: 'transparent',
+  },
+  scanHint: {
+    color: '#fff',
+    fontSize: 14,
+    marginTop: 20,
+    textAlign: 'center',
+  },
+  scanCloseBtn: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   switchRow: {
     flexDirection: 'row',
@@ -205,14 +425,8 @@ const styles = StyleSheet.create({
     marginTop: 20,
     marginBottom: 24,
   },
-  button: {
-    borderRadius: 10,
-    padding: 16,
-    alignItems: 'center',
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '700',
+  switchLabel: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
