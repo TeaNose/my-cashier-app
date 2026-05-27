@@ -112,6 +112,15 @@ describe('buildReceipt', () => {
     expect(blocks.some((b) => b.kind === 'text' && (b as { text: string }).text.startsWith('Catatan:'))).toBe(false);
   });
 
+  it('renders a divider between the items section and the TOTAL row', () => {
+    const blocks = buildReceipt(baseTransaction, baseItems, baseShop);
+    const totalIdx = blocks.findIndex(
+      (b) => b.kind === 'columns' && (b as { cols: [string, string] }).cols[0] === 'TOTAL',
+    );
+    expect(totalIdx).toBeGreaterThan(0);
+    expect(blocks[totalIdx - 1]).toEqual({ kind: 'divider' });
+  });
+
   it('renders the footer centered, then a feed for the tear bar', () => {
     const blocks = buildReceipt(baseTransaction, baseItems, baseShop);
     const footerIdx = blocks.findIndex(

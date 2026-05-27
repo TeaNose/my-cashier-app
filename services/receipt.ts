@@ -68,6 +68,8 @@ export function buildReceipt(
     });
   }
 
+  blocks.push({ kind: 'divider' });
+
   blocks.push({ kind: 'columns', cols: ['TOTAL', `Rp ${formatNumber(transaction.total)}`], bold: true });
   blocks.push({ kind: 'columns', cols: ['Bayar', `Rp ${formatNumber(transaction.amount_paid)}`] });
   if (transaction.change_amount > 0) {
