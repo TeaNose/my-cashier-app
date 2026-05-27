@@ -56,6 +56,11 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
       FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE CASCADE,
       FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL
     );
+
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key   TEXT PRIMARY KEY,
+      value TEXT
+    );
   `);
 
   return db;
