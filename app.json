@@ -46,7 +46,8 @@
             "backgroundColor": "#1c1c1e"
           }
         }
-      ]
+      ],
+      "./plugins/with-bluetooth-printer.js"
     ],
     "experiments": {
       "typedRoutes": true
