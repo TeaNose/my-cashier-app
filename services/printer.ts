@@ -94,31 +94,30 @@ export async function connect(mac: string): Promise<void> {
 }
 
 export async function disconnect(): Promise<void> {
-  if (!connectedMac) return;
-  try {
-    await (BluetoothManager as any).disconnect(connectedMac);
-  } finally {
-    connectedMac = null;
-  }
+  // tp-react-native-bluetooth-printer exposes no disconnect method on the
+  // native side; clearing the cached MAC is the most we can do. The
+  // underlying socket is closed by the OS when the app backgrounds or the
+  // peer device drops the connection.
+  connectedMac = null;
 }
 
 async function emitBlock(block: ReceiptBlock): Promise<void> {
   switch (block.kind) {
     case 'text': {
       await BluetoothEscposPrinter.printerAlign(ALIGN[block.align ?? 'left']);
-      await (BluetoothEscposPrinter as any).setBlob(block.bold ? 1 : 0);
+      await BluetoothEscposPrinter.setBold(block.bold ? 1 : 0);
       const opts: any = {
         widthtimes: block.size === 'double' ? 1 : 0,
         heigthtimes: block.size === 'double' ? 1 : 0,
         fonttype: 0,
       };
       await BluetoothEscposPrinter.printText(block.text + '\r\n', opts);
-      await (BluetoothEscposPrinter as any).setBlob(0);
+      await BluetoothEscposPrinter.setBold(0);
       break;
     }
     case 'columns': {
       await BluetoothEscposPrinter.printerAlign(ALIGN.left);
-      await (BluetoothEscposPrinter as any).setBlob(block.bold ? 1 : 0);
+      await BluetoothEscposPrinter.setBold(block.bold ? 1 : 0);
       const leftWidth = 20;
       const rightWidth = 12;
       await BluetoothEscposPrinter.printColumn(
@@ -127,7 +126,7 @@ async function emitBlock(block: ReceiptBlock): Promise<void> {
         [block.cols[0], block.cols[1]],
         { encoding: 'CP437', codepage: 0, fonttype: 0 } as any,
       );
-      await (BluetoothEscposPrinter as any).setBlob(0);
+      await BluetoothEscposPrinter.setBold(0);
       break;
     }
     case 'divider': {
