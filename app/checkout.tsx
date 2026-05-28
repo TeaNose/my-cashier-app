@@ -89,6 +89,7 @@ export default function CheckoutScreen() {
 
   const handlePrint = async () => {
     if (!savedPrinter || savedTransactionId === null) return;
+    if (printStatus === 'printing') return;
     setPrintError(null);
     setPrintStatus('printing');
     try {

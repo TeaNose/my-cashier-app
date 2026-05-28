@@ -84,11 +84,14 @@ export default function HistoryScreen() {
     if (data) {
       setSelected(data);
       setShowDetail(true);
+      setPrintStatus('idle');
+      setPrintError(null);
     }
   };
 
   const handleReprint = async () => {
     if (!savedPrinter || !selected) return;
+    if (printStatus === 'printing') return;
     setPrintError(null);
     setPrintStatus('printing');
     try {
