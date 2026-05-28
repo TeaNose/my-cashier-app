@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   StyleSheet,
   TouchableOpacity,
   Alert,
   TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -15,6 +16,9 @@ import { useTheme } from '@/hooks/useTheme';
 import { createTransaction, type CartItem } from '@/db/transactions';
 import { requestCartClear } from './(tabs)/cashier';
 import { t } from '@/i18n';
+import { getShopInfo, getSavedPrinter, type SavedPrinter } from '@/db/settings';
+import { buildReceipt } from '@/services/receipt';
+import { printReceipt, PrinterError } from '@/services/printer';
 
 const QUICK_AMOUNTS = [1000, 2000, 5000, 10000, 20000, 50000, 100000];
 
@@ -30,6 +34,14 @@ export default function CheckoutScreen() {
   const [saving, setSaving] = useState(false);
   const [completed, setCompleted] = useState(false);
   const [changeAmount, setChangeAmount] = useState(0);
+  const [savedPrinter, setSavedPrinter] = useState<SavedPrinter | null>(null);
+  const [printStatus, setPrintStatus] = useState<'idle' | 'printing' | 'done' | 'error'>('idle');
+  const [printError, setPrintError] = useState<string | null>(null);
+  const [savedTransactionId, setSavedTransactionId] = useState<number | null>(null);
+
+  useEffect(() => {
+    getSavedPrinter().then(setSavedPrinter);
+  }, []);
 
   const paidNum = Number(amountPaid) || 0;
   const isExact = paidNum === total;
@@ -37,6 +49,15 @@ export default function CheckoutScreen() {
 
   const formatPrice = (price: number) =>
     price.toLocaleString('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 });
+
+  const formatThousands = (value: string) => {
+    if (!value) return '';
+    return Number(value).toLocaleString('id-ID');
+  };
+
+  const handleAmountChange = (value: string) => {
+    setAmountPaid(value.replace(/\D/g, ''));
+  };
 
   const handleQuickAmount = (amount: number) => {
     setAmountPaid((prev) => String((Number(prev) || 0) + amount));
@@ -57,11 +78,49 @@ export default function CheckoutScreen() {
         notes || undefined,
       );
       setChangeAmount(transaction.change_amount);
+      setSavedTransactionId(transaction.id);
       setCompleted(true);
     } catch (error) {
       Alert.alert(t('common.error'), t('checkout.save_failed'));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handlePrint = async () => {
+    if (!savedPrinter || savedTransactionId === null) return;
+    setPrintError(null);
+    setPrintStatus('printing');
+    try {
+      const shopInfo = await getShopInfo();
+      const transactionRow = {
+        id: savedTransactionId,
+        total,
+        amount_paid: paidNum,
+        change_amount: changeAmount,
+        payment_method: 'cash',
+        notes: notes || null,
+        created_at: new Date().toISOString().slice(0, 19).replace('T', ' '),
+      };
+      const items = cart.map((c, i) => ({
+        id: i + 1,
+        transaction_id: savedTransactionId,
+        product_id: c.product_id,
+        product_name: c.product_name,
+        price: c.price,
+        qty: c.qty,
+        subtotal: c.price * c.qty,
+      }));
+      const blocks = buildReceipt(transactionRow, items, shopInfo);
+      await printReceipt(savedPrinter.mac, blocks);
+      setPrintStatus('done');
+    } catch (e) {
+      if (e instanceof PrinterError) {
+        setPrintError(t(`printer.err_${e.code}` as any));
+      } else {
+        setPrintError(t('common.error'));
+      }
+      setPrintStatus('error');
     }
   };
 
@@ -83,7 +142,31 @@ export default function CheckoutScreen() {
           </>
         )}
         <TouchableOpacity
-          style={[styles.doneBtn, { backgroundColor: tint }]}
+          style={[
+            styles.doneBtn,
+            { backgroundColor: tint, opacity: savedPrinter ? 1 : 0.4 },
+          ]}
+          onPress={handlePrint}
+          disabled={!savedPrinter || printStatus === 'printing'}
+        >
+          {printStatus === 'printing' ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.doneBtnText}>
+              {printStatus === 'done' ? t('printer.reprint') : t('printer.print_receipt')}
+            </Text>
+          )}
+        </TouchableOpacity>
+        {!savedPrinter && (
+          <TouchableOpacity onPress={() => (router as any).push('/(tabs)/settings')}>
+            <Text style={styles.helperText}>{t('printer.no_printer_hint')}</Text>
+          </TouchableOpacity>
+        )}
+        {printError && (
+          <Text style={styles.errorText}>{printError}</Text>
+        )}
+        <TouchableOpacity
+          style={[styles.doneBtn, { backgroundColor: tint, marginTop: 12 }]}
           onPress={() => {
             requestCartClear();
             router.dismissAll();
@@ -140,8 +223,8 @@ export default function CheckoutScreen() {
             color: text,
           },
         ]}
-        value={amountPaid}
-        onChangeText={setAmountPaid}
+        value={formatThousands(amountPaid)}
+        onChangeText={handleAmountChange}
         placeholder="0"
         placeholderTextColor={text + '40'}
         keyboardType="number-pad"
@@ -346,5 +429,16 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '700',
+  },
+  helperText: {
+    color: '#FF9500',
+    fontSize: 13,
+    marginTop: 8,
+    textDecorationLine: 'underline',
+  },
+  errorText: {
+    color: '#FF3B30',
+    fontSize: 13,
+    marginTop: 8,
   },
 });
