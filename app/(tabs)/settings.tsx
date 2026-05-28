@@ -45,14 +45,20 @@ export default function SettingsScreen() {
     try {
       await setShopInfo({ name, address, footer });
       Alert.alert(t('common.success'), t('settings.saved'));
+    } catch {
+      Alert.alert(t('common.error'), t('common.try_again'));
     } finally {
       setSaving(false);
     }
   };
 
   const handleRemovePrinter = async () => {
-    await setSavedPrinter(null);
-    setPrinter(null);
+    try {
+      await setSavedPrinter(null);
+      setPrinter(null);
+    } catch {
+      Alert.alert(t('common.error'), t('common.try_again'));
+    }
   };
 
   return (
