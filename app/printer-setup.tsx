@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
-import FontAwesome from '@expo/vector-icons/FontAwesome';
+import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 
 import { Text, View } from '@/components/Themed';
 import { useTheme } from '@/hooks/useTheme';
@@ -57,8 +57,32 @@ export default function PrinterSetupScreen() {
   }, []);
 
   useEffect(() => {
-    runScan();
-  }, [runScan]);
+    let alive = true;
+    (async () => {
+      setErrorMsg(null);
+      setStatus('scanning');
+      try {
+        await ensurePermissions();
+        await enableBluetooth();
+        const { paired: p, found: f } = await scanDevices();
+        if (!alive) return;
+        setPaired(p);
+        setFound(f);
+        setStatus('idle');
+      } catch (e) {
+        if (!alive) return;
+        if (e instanceof PrinterError) {
+          setErrorMsg(t(errorKey(e.code) as any));
+        } else {
+          setErrorMsg(t('common.error'));
+        }
+        setStatus('error');
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const handlePick = async (device: BluetoothDevice) => {
     setErrorMsg(null);
@@ -89,16 +113,25 @@ export default function PrinterSetupScreen() {
 
   const handleSave = async () => {
     if (!selected) return;
-    await setSavedPrinter({ mac: selected.address, name: selected.name || selected.address });
-    router.back();
+    try {
+      await setSavedPrinter({ mac: selected.address, name: selected.name || selected.address });
+      router.back();
+    } catch {
+      setErrorMsg(t('common.error'));
+      setStatus('error');
+    }
   };
 
   const renderDevice = (device: BluetoothDevice) => {
     const isSelected = selected?.address === device.address;
     return (
       <View key={device.address} style={[styles.deviceCard, { borderColor: inputBorder }]}>
-        <TouchableOpacity style={styles.deviceRow} onPress={() => handlePick(device)}>
-          <FontAwesome
+        <TouchableOpacity
+          style={styles.deviceRow}
+          onPress={() => handlePick(device)}
+          disabled={status === 'connecting' || status === 'scanning' || status === 'testing'}
+        >
+          <FontAwesome5
             name={isSelected && status === 'connected' ? 'check-circle' : 'bluetooth'}
             size={20}
             color={tint}
