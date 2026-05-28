@@ -58,6 +58,7 @@ function RootLayoutNav() {
         <Stack.Screen name="edit-product" options={{ title: t('stack.edit_product') }} />
         <Stack.Screen name="add-category" options={{ title: t('stack.add_category') }} />
         <Stack.Screen name="checkout" options={{ title: t('stack.checkout') }} />
+        <Stack.Screen name="printer-setup" options={{ title: t('stack.printer_setup') }} />
       </Stack>
     </ThemeProvider>
   );
