@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react';
-import { StyleSheet, FlatList, TouchableOpacity, Modal, Platform } from 'react-native';
+import { useState, useCallback, useEffect } from 'react';
+import { StyleSheet, FlatList, TouchableOpacity, Modal, Platform, ActivityIndicator, Alert } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -13,6 +13,10 @@ import {
   type TransactionWithItems,
 } from '@/db/transactions';
 import { t } from '@/i18n';
+import { getShopInfo, getSavedPrinter, type SavedPrinter } from '@/db/settings';
+import { buildReceipt } from '@/services/receipt';
+import { printReceipt, PrinterError } from '@/services/printer';
+import { exportTransactionsCsv, ExportError } from '@/services/export';
 
 export default function HistoryScreen() {
   const { tint, background, inputBorder } = useTheme();
@@ -22,6 +26,14 @@ export default function HistoryScreen() {
   const [showDetail, setShowDetail] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [savedPrinter, setSavedPrinter] = useState<SavedPrinter | null>(null);
+  const [printStatus, setPrintStatus] = useState<'idle' | 'printing' | 'done' | 'error'>('idle');
+  const [printError, setPrintError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+
+  useEffect(() => {
+    getSavedPrinter().then(setSavedPrinter);
+  }, []);
 
   const loadTransactions = useCallback((date: Date) => {
     getTransactionsByDate(date).then(setTransactions);
@@ -74,6 +86,41 @@ export default function HistoryScreen() {
     if (data) {
       setSelected(data);
       setShowDetail(true);
+      setPrintStatus('idle');
+      setPrintError(null);
+    }
+  };
+
+  const handleReprint = async () => {
+    if (!savedPrinter || !selected) return;
+    if (printStatus === 'printing') return;
+    setPrintError(null);
+    setPrintStatus('printing');
+    try {
+      const shopInfo = await getShopInfo();
+      const blocks = buildReceipt(selected, selected.items, shopInfo);
+      await printReceipt(savedPrinter.mac, blocks);
+      setPrintStatus('done');
+    } catch (e) {
+      if (e instanceof PrinterError) {
+        setPrintError(t(`printer.err_${e.code}` as any));
+      } else {
+        setPrintError(t('common.error'));
+      }
+      setPrintStatus('error');
+    }
+  };
+
+  const handleExport = async () => {
+    if (exporting || transactions.length === 0) return;
+    setExporting(true);
+    try {
+      await exportTransactionsCsv(selectedDate);
+    } catch (e) {
+      const code = e instanceof ExportError ? e.code : 'failed';
+      Alert.alert(t('common.error'), t(`export.${code}` as any));
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -114,9 +161,27 @@ export default function HistoryScreen() {
           <Text style={styles.dateBtnText}>{formatDayLabel(selectedDate)}</Text>
           <FontAwesome name="caret-down" size={14} color={tint} />
         </TouchableOpacity>
-        <View style={styles.dayTotalRow}>
-          <Text style={styles.dayTotalLabel}>{t('history.tx_count', { count: transactions.length })}</Text>
-          <Text style={[styles.dayTotalValue, { color: tint }]}>{formatPrice(totalForDay)}</Text>
+        <View style={styles.headerRight}>
+          <View style={styles.dayTotalRow}>
+            <Text style={styles.dayTotalLabel}>{t('history.tx_count', { count: transactions.length })}</Text>
+            <Text style={[styles.dayTotalValue, { color: tint }]}>{formatPrice(totalForDay)}</Text>
+          </View>
+          <TouchableOpacity
+            style={[
+              styles.exportBtn,
+              { borderColor: inputBorder, opacity: transactions.length === 0 ? 0.4 : 1 },
+            ]}
+            activeOpacity={0.7}
+            onPress={handleExport}
+            disabled={transactions.length === 0 || exporting}
+            accessibilityLabel={t('export.button')}
+          >
+            {exporting ? (
+              <ActivityIndicator size="small" color={tint} />
+            ) : (
+              <FontAwesome name="share-square-o" size={18} color={tint} />
+            )}
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -150,7 +215,11 @@ export default function HistoryScreen() {
         <TouchableOpacity
           style={styles.modalOverlay}
           activeOpacity={1}
-          onPress={() => setShowDetail(false)}
+          onPress={() => {
+            setShowDetail(false);
+            setPrintStatus('idle');
+            setPrintError(null);
+          }}
         >
           <View style={styles.modalContent}>
             {selected && (
@@ -195,6 +264,26 @@ export default function HistoryScreen() {
                 {selected.notes ? (
                   <Text style={styles.notesText}>{t('history.notes_label')}: {selected.notes}</Text>
                 ) : null}
+                <TouchableOpacity
+                  style={[
+                    styles.reprintBtn,
+                    { backgroundColor: tint, opacity: savedPrinter ? 1 : 0.4 },
+                  ]}
+                  onPress={handleReprint}
+                  disabled={!savedPrinter || printStatus === 'printing'}
+                >
+                  {printStatus === 'printing' ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.reprintBtnText}>{t('printer.reprint')}</Text>
+                  )}
+                </TouchableOpacity>
+                {!savedPrinter && (
+                  <Text style={styles.reprintHint}>{t('printer.no_printer_hint')}</Text>
+                )}
+                {printError && (
+                  <Text style={styles.reprintError}>{printError}</Text>
+                )}
               </>
             )}
           </View>
@@ -230,8 +319,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
   dayTotalRow: {
     alignItems: 'flex-end',
+  },
+  exportBtn: {
+    borderWidth: 1,
+    borderRadius: 10,
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   dayTotalLabel: {
     fontSize: 11,
@@ -367,4 +469,14 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontStyle: 'italic',
   },
+  reprintBtn: {
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  reprintBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  reprintHint: { color: '#FF9500', fontSize: 13, marginTop: 8, textAlign: 'center' },
+  reprintError: { color: '#FF3B30', fontSize: 13, marginTop: 8, textAlign: 'center' },
 });

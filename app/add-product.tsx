@@ -1,41 +1,43 @@
-import { useState, useEffect, useRef } from 'react';
+import FontAwesome from "@expo/vector-icons/FontAwesome";
+import { CameraView, useCameraPermissions } from "expo-camera";
+import { router } from "expo-router";
+import { useEffect, useRef, useState } from "react";
 import {
+  Alert,
+  FlatList,
+  Modal,
   StyleSheet,
   Switch,
-  Alert,
   TouchableOpacity,
-  Modal,
-  FlatList,
-} from 'react-native';
-import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
-import { router } from 'expo-router';
-import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { CameraView, useCameraPermissions } from 'expo-camera';
+} from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 
-import { Text, View } from '@/components/Themed';
-import { FormInput } from '@/components/FormInput';
-import { PrimaryButton } from '@/components/PrimaryButton';
-import { useTheme } from '@/hooks/useTheme';
-import { getCategories, type Category } from '@/db/categories';
-import { createProduct } from '@/db/products';
-import { t } from '@/i18n';
+import { FormInput } from "@/components/FormInput";
+import { PrimaryButton } from "@/components/PrimaryButton";
+import { Text, View } from "@/components/Themed";
+import { getCategories, type Category } from "@/db/categories";
+import { createProduct } from "@/db/products";
+import { useTheme } from "@/hooks/useTheme";
+import { t } from "@/i18n";
 
 export default function AddProductScreen() {
   const { tint, background } = useTheme();
 
-  const [name, setName] = useState('');
-  const [sku, setSku] = useState('');
-  const [barcode, setBarcode] = useState('');
+  const [name, setName] = useState("");
+  const [sku, setSku] = useState("");
+  const [barcode, setBarcode] = useState("");
   const [scanning, setScanning] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
   const scanCooldown = useRef(false);
-  const [buyPrice, setBuyPrice] = useState('');
-  const [sellPrice, setSellPrice] = useState('');
-  const [stockQty, setStockQty] = useState('');
-  const [minStockAlert, setMinStockAlert] = useState('');
-  const [unit, setUnit] = useState('');
+  const [buyPrice, setBuyPrice] = useState("");
+  const [sellPrice, setSellPrice] = useState("");
+  const [stockQty, setStockQty] = useState("");
+  const [minStockAlert, setMinStockAlert] = useState("");
+  const [unit, setUnit] = useState("");
   const [isActive, setIsActive] = useState(true);
-  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<Category | null>(
+    null,
+  );
   const [categories, setCategories] = useState<Category[]>([]);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -46,11 +48,11 @@ export default function AddProductScreen() {
 
   const handleSave = async () => {
     if (!name.trim()) {
-      Alert.alert(t('common.validation'), t('products.name_required'));
+      Alert.alert(t("common.validation"), t("products.name_required"));
       return;
     }
     if (!sellPrice.trim() || isNaN(Number(sellPrice))) {
-      Alert.alert(t('common.validation'), t('products.sell_price_required'));
+      Alert.alert(t("common.validation"), t("products.sell_price_required"));
       return;
     }
 
@@ -68,11 +70,14 @@ export default function AddProductScreen() {
         min_stock_alert: Number(minStockAlert) || 0,
         is_active: isActive,
       });
-      Alert.alert(t('common.success'), t('products.created', { name }), [
-        { text: t('common.ok'), onPress: () => router.back() },
+      Alert.alert(t("common.success"), t("products.created", { name }), [
+        { text: t("common.ok"), onPress: () => router.back() },
       ]);
     } catch (error) {
-      Alert.alert(t('common.error'), `${t('products.save_failed')} ${t('common.try_again')}`);
+      Alert.alert(
+        t("common.error"),
+        `${t("products.save_failed")} ${t("common.try_again")}`,
+      );
     } finally {
       setSaving(false);
     }
@@ -87,30 +92,30 @@ export default function AddProductScreen() {
       enableOnAndroid={true}
     >
       {/* Basic Info */}
-      <Text style={styles.sectionTitle}>{t('products.basic_info')}</Text>
+      <Text style={styles.sectionTitle}>{t("products.basic_info")}</Text>
       <View style={styles.section}>
         <FormInput
-          label={t('products.name')}
+          label={t("products.name")}
           value={name}
           onChangeText={setName}
-          placeholder={t('products.name_placeholder')}
+          placeholder={t("products.name_placeholder")}
         />
         <FormInput
-          label={t('products.sku')}
+          label={t("products.sku")}
           value={sku}
           onChangeText={setSku}
-          placeholder={t('products.sku_placeholder')}
+          placeholder={t("products.sku_placeholder")}
           autoCapitalize="characters"
         />
 
         {/* Barcode */}
-        <Text style={styles.inputLabel}>{t('products.barcode')}</Text>
         <View style={styles.barcodeRow}>
           <View style={styles.barcodeInputWrapper}>
             <FormInput
+              label={t("products.barcode")}
               value={barcode}
               onChangeText={setBarcode}
-              placeholder={t('products.barcode_placeholder')}
+              placeholder={t("products.barcode_placeholder")}
             />
           </View>
           <TouchableOpacity
@@ -119,7 +124,10 @@ export default function AddProductScreen() {
               if (!permission?.granted) {
                 const result = await requestPermission();
                 if (!result.granted) {
-                  Alert.alert(t('products.permission_required'), t('products.camera_permission'));
+                  Alert.alert(
+                    t("products.permission_required"),
+                    t("products.camera_permission"),
+                  );
                   return;
                 }
               }
@@ -131,13 +139,20 @@ export default function AddProductScreen() {
         </View>
 
         {/* Category Dropdown */}
-        <Text style={styles.inputLabel}>{t('products.category')}</Text>
+        <Text style={styles.inputLabel}>{t("products.category")}</Text>
         <TouchableOpacity
-          style={[styles.dropdown, { borderColor: tint + '40' }]}
+          style={[styles.dropdown, { borderColor: tint + "40" }]}
           onPress={() => setShowCategoryPicker(true)}
         >
-          <Text style={[styles.dropdownText, !selectedCategory && styles.dropdownPlaceholder]}>
-            {selectedCategory ? selectedCategory.name : t('products.select_category')}
+          <Text
+            style={[
+              styles.dropdownText,
+              !selectedCategory && styles.dropdownPlaceholder,
+            ]}
+          >
+            {selectedCategory
+              ? selectedCategory.name
+              : t("products.select_category")}
           </Text>
           <Text style={styles.dropdownArrow}>▼</Text>
         </TouchableOpacity>
@@ -149,9 +164,13 @@ export default function AddProductScreen() {
             onPress={() => setShowCategoryPicker(false)}
           >
             <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>{t('products.select_category_title')}</Text>
+              <Text style={styles.modalTitle}>
+                {t("products.select_category_title")}
+              </Text>
               {categories.length === 0 ? (
-                <Text style={styles.emptyText}>{t('products.no_categories')}</Text>
+                <Text style={styles.emptyText}>
+                  {t("products.no_categories")}
+                </Text>
               ) : (
                 <FlatList
                   data={categories}
@@ -160,7 +179,9 @@ export default function AddProductScreen() {
                     <TouchableOpacity
                       style={[
                         styles.optionRow,
-                        selectedCategory?.id === item.id && { backgroundColor: tint + '20' },
+                        selectedCategory?.id === item.id && {
+                          backgroundColor: tint + "20",
+                        },
                       ]}
                       onPress={() => {
                         setSelectedCategory(item);
@@ -169,7 +190,9 @@ export default function AddProductScreen() {
                     >
                       <Text style={styles.optionText}>{item.name}</Text>
                       {selectedCategory?.id === item.id && (
-                        <Text style={[styles.checkMark, { color: tint }]}>✓</Text>
+                        <Text style={[styles.checkMark, { color: tint }]}>
+                          ✓
+                        </Text>
                       )}
                     </TouchableOpacity>
                   )}
@@ -183,7 +206,9 @@ export default function AddProductScreen() {
                     setShowCategoryPicker(false);
                   }}
                 >
-                  <Text style={styles.clearButtonText}>{t('products.clear_selection')}</Text>
+                  <Text style={styles.clearButtonText}>
+                    {t("products.clear_selection")}
+                  </Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -191,25 +216,25 @@ export default function AddProductScreen() {
         </Modal>
 
         <FormInput
-          label={t('products.unit')}
+          label={t("products.unit")}
           value={unit}
           onChangeText={setUnit}
-          placeholder={t('products.unit_placeholder')}
+          placeholder={t("products.unit_placeholder")}
         />
       </View>
 
       {/* Pricing */}
-      <Text style={styles.sectionTitle}>{t('products.pricing')}</Text>
+      <Text style={styles.sectionTitle}>{t("products.pricing")}</Text>
       <View style={styles.section}>
         <FormInput
-          label={t('products.buy_price')}
+          label={t("products.buy_price")}
           value={buyPrice}
           onChangeText={setBuyPrice}
           placeholder="0"
           keyboardType="decimal-pad"
         />
         <FormInput
-          label={t('products.sell_price')}
+          label={t("products.sell_price")}
           value={sellPrice}
           onChangeText={setSellPrice}
           placeholder="0"
@@ -218,17 +243,17 @@ export default function AddProductScreen() {
       </View>
 
       {/* Stock */}
-      <Text style={styles.sectionTitle}>{t('products.stock_section')}</Text>
+      <Text style={styles.sectionTitle}>{t("products.stock_section")}</Text>
       <View style={styles.section}>
         <FormInput
-          label={t('products.stock_qty')}
+          label={t("products.stock_qty")}
           value={stockQty}
           onChangeText={setStockQty}
           placeholder="0"
           keyboardType="number-pad"
         />
         <FormInput
-          label={t('products.min_stock_alert')}
+          label={t("products.min_stock_alert")}
           value={minStockAlert}
           onChangeText={setMinStockAlert}
           placeholder="0"
@@ -238,29 +263,40 @@ export default function AddProductScreen() {
 
       {/* Status */}
       <View style={styles.switchRow}>
-        <Text style={styles.switchLabel}>{t('common.active')}</Text>
-        <Switch value={isActive} onValueChange={setIsActive} trackColor={{ true: tint }} />
+        <Text style={styles.switchLabel}>{t("common.active")}</Text>
+        <Switch
+          value={isActive}
+          onValueChange={setIsActive}
+          trackColor={{ true: tint }}
+        />
       </View>
 
-      <PrimaryButton label={saving ? t('common.saving') : t('products.save_product')} onPress={handleSave} />
+      <PrimaryButton
+        label={saving ? t("common.saving") : t("products.save_product")}
+        onPress={handleSave}
+      />
 
       {/* Barcode Scanner Modal */}
       <Modal visible={scanning} animationType="slide">
         <View style={styles.scannerContainer}>
           <CameraView
             style={styles.camera}
-            barcodeScannerSettings={{ barcodeTypes: ['qr', 'ean13', 'ean8', 'code128', 'code39'] }}
+            barcodeScannerSettings={{
+              barcodeTypes: ["qr", "ean13", "ean8", "code128", "code39"],
+            }}
             onBarcodeScanned={({ data }) => {
               if (scanCooldown.current) return;
               scanCooldown.current = true;
               setBarcode(data);
               setScanning(false);
-              setTimeout(() => { scanCooldown.current = false; }, 1500);
+              setTimeout(() => {
+                scanCooldown.current = false;
+              }, 1500);
             }}
           />
           <View style={styles.scanOverlay}>
             <View style={styles.scanFrame} />
-            <Text style={styles.scanHint}>{t('products.point_camera')}</Text>
+            <Text style={styles.scanHint}>{t("products.point_camera")}</Text>
           </View>
           <TouchableOpacity
             style={styles.scanCloseBtn}
@@ -284,7 +320,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: "700",
     marginTop: 20,
     marginBottom: 4,
   },
@@ -293,14 +329,14 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
     marginTop: 12,
     marginBottom: 6,
   },
   dropdown: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     borderWidth: 1,
     borderRadius: 10,
     paddingHorizontal: 14,
@@ -321,8 +357,8 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
     paddingHorizontal: 30,
   },
   modalContent: {
@@ -333,19 +369,19 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: "700",
     marginBottom: 12,
-    textAlign: 'center',
+    textAlign: "center",
   },
   emptyText: {
-    textAlign: 'center',
+    textAlign: "center",
     opacity: 0.5,
     paddingVertical: 20,
   },
   optionRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingVertical: 14,
     paddingHorizontal: 12,
     borderRadius: 8,
@@ -355,21 +391,21 @@ const styles = StyleSheet.create({
   },
   checkMark: {
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   clearButton: {
     marginTop: 12,
     paddingVertical: 10,
-    alignItems: 'center',
+    alignItems: "center",
   },
   clearButtonText: {
     fontSize: 14,
-    color: '#FF3B30',
-    fontWeight: '600',
+    color: "#FF3B30",
+    fontWeight: "600",
   },
   barcodeRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
+    flexDirection: "row",
+    alignItems: "flex-end",
     gap: 8,
   },
   barcodeInputWrapper: {
@@ -379,57 +415,57 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginTop: 0,
   },
   scannerContainer: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: "#000",
   },
   camera: {
     flex: 1,
   },
   scanOverlay: {
     ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'transparent',
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "transparent",
   },
   scanFrame: {
     width: 250,
     height: 250,
     borderWidth: 2,
-    borderColor: '#fff',
+    borderColor: "#fff",
     borderRadius: 16,
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
   },
   scanHint: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 14,
     marginTop: 20,
-    textAlign: 'center',
+    textAlign: "center",
   },
   scanCloseBtn: {
-    position: 'absolute',
+    position: "absolute",
     top: 50,
     right: 20,
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "rgba(0,0,0,0.5)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   switchRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginTop: 20,
     marginBottom: 24,
   },
   switchLabel: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
   },
 });

@@ -1,4 +1,5 @@
 import { getDatabase } from './database';
+import { t } from '@/i18n';
 
 export type Transaction = {
   id: number;
@@ -100,6 +101,104 @@ export async function getTransactionsByDate(date: Date): Promise<Transaction[]> 
     toSqlUtc(start),
     toSqlUtc(end),
   );
+}
+
+export async function getTransactionsWithItemsByDate(
+  date: Date,
+): Promise<TransactionWithItems[]> {
+  const db = await getDatabase();
+  const transactions = await getTransactionsByDate(date);
+  if (transactions.length === 0) return [];
+
+  const ids = transactions.map((tx) => tx.id);
+  const placeholders = ids.map(() => '?').join(',');
+  const items = await db.getAllAsync<TransactionItem>(
+    `SELECT * FROM transaction_items WHERE transaction_id IN (${placeholders})`,
+    ...ids,
+  );
+
+  const itemsByTx = new Map<number, TransactionItem[]>();
+  for (const item of items) {
+    const list = itemsByTx.get(item.transaction_id);
+    if (list) list.push(item);
+    else itemsByTx.set(item.transaction_id, [item]);
+  }
+
+  return transactions.map((tx) => ({ ...tx, items: itemsByTx.get(tx.id) ?? [] }));
+}
+
+function csvField(value: string | number): string {
+  const s = String(value);
+  if (/[",\n\r]/.test(s)) {
+    return `"${s.replace(/"/g, '""')}"`;
+  }
+  return s;
+}
+
+function formatCsvDate(createdAt: string): string {
+  // created_at is stored in UTC; append 'Z' so it's parsed as UTC, then show local time.
+  const d = new Date(createdAt + 'Z');
+  return d.toLocaleString('id-ID', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+export function buildTransactionsCsv(
+  transactions: TransactionWithItems[],
+  shopName: string,
+  date: Date,
+): string {
+  const dateLabel = date.toLocaleDateString('id-ID', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+
+  const rows: string[] = [];
+  rows.push(csvField(shopName || t('export.untitled_shop')));
+  rows.push(csvField(`${t('export.title')} - ${dateLabel}`));
+  rows.push('');
+  rows.push(
+    [
+      t('export.col_id'),
+      t('export.col_date'),
+      t('export.col_method'),
+      t('export.col_product'),
+      t('export.col_qty'),
+      t('export.col_price'),
+      t('export.col_subtotal'),
+      t('export.col_notes'),
+    ]
+      .map(csvField)
+      .join(','),
+  );
+
+  for (const tx of transactions) {
+    const txDate = formatCsvDate(tx.created_at);
+    for (const item of tx.items) {
+      rows.push(
+        [
+          tx.id,
+          txDate,
+          tx.payment_method,
+          item.product_name,
+          item.qty,
+          item.price,
+          item.subtotal,
+          tx.notes ?? '',
+        ]
+          .map(csvField)
+          .join(','),
+      );
+    }
+  }
+
+  // Prepend a UTF-8 BOM so Excel reads non-ASCII text correctly.
+  return '﻿' + rows.join('\r\n') + '\r\n';
 }
 
 export async function getTransactionWithItems(id: number): Promise<TransactionWithItems | null> {
