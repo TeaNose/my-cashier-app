@@ -215,21 +215,32 @@ export default function CheckoutScreen() {
       {/* Payment */}
       <Text style={styles.sectionTitle}>{t('checkout.payment')}</Text>
       <Text style={styles.inputLabel}>{t('checkout.amount_paid')}</Text>
-      <TextInput
-        style={[
-          styles.amountInput,
-          {
-            backgroundColor: inputBackground,
-            borderColor: isSufficient || !amountPaid ? inputBorder : '#FF3B30',
-            color: text,
-          },
-        ]}
-        value={formatThousands(amountPaid)}
-        onChangeText={handleAmountChange}
-        placeholder="0"
-        placeholderTextColor={text + '40'}
-        keyboardType="number-pad"
-      />
+      <View style={styles.amountInputWrapper}>
+        <TextInput
+          style={[
+            styles.amountInput,
+            {
+              backgroundColor: inputBackground,
+              borderColor: isSufficient || !amountPaid ? inputBorder : '#FF3B30',
+              color: text,
+            },
+          ]}
+          value={formatThousands(amountPaid)}
+          onChangeText={handleAmountChange}
+          placeholder="0"
+          placeholderTextColor={text + '40'}
+          keyboardType="number-pad"
+        />
+        {amountPaid.length > 0 && (
+          <TouchableOpacity
+            style={styles.clearBtn}
+            onPress={() => setAmountPaid('')}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <FontAwesome name="times-circle" size={22} color={text + '66'} />
+          </TouchableOpacity>
+        )}
+      </View>
 
       {/* Quick Amount Buttons */}
       <View style={styles.quickRow}>
@@ -348,14 +359,22 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 6,
   },
+  amountInputWrapper: {
+    position: 'relative',
+    justifyContent: 'center',
+  },
   amountInput: {
     borderWidth: 1,
     borderRadius: 10,
-    paddingHorizontal: 14,
+    paddingHorizontal: 44,
     paddingVertical: 14,
     fontSize: 20,
     fontWeight: '700',
     textAlign: 'center',
+  },
+  clearBtn: {
+    position: 'absolute',
+    right: 12,
   },
   quickRow: {
     flexDirection: 'row',

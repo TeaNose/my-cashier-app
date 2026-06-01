@@ -48,7 +48,7 @@ export function SplashOverlay({ onFinish }: Props) {
           <FontAwesome name="shopping-cart" size={48} color="#fff" />
         </View>
         <Animated.Text style={[styles.title, { color: palette.text }]}>
-          My Cashier App
+          Lapakku
         </Animated.Text>
         <Animated.Text style={[styles.subtitle, { color: palette.text }]}>
           {t('splash.tagline')}
