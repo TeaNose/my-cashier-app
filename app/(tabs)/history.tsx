@@ -115,7 +115,7 @@ export default function HistoryScreen() {
     if (exporting || transactions.length === 0) return;
     setExporting(true);
     try {
-      await exportTransactionsCsv(transactions, selectedDate);
+      await exportTransactionsCsv(selectedDate);
     } catch (e) {
       const code = e instanceof ExportError ? e.code : 'failed';
       Alert.alert(t('common.error'), t(`export.${code}` as any));

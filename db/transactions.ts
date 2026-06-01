@@ -103,6 +103,30 @@ export async function getTransactionsByDate(date: Date): Promise<Transaction[]> 
   );
 }
 
+export async function getTransactionsWithItemsByDate(
+  date: Date,
+): Promise<TransactionWithItems[]> {
+  const db = await getDatabase();
+  const transactions = await getTransactionsByDate(date);
+  if (transactions.length === 0) return [];
+
+  const ids = transactions.map((tx) => tx.id);
+  const placeholders = ids.map(() => '?').join(',');
+  const items = await db.getAllAsync<TransactionItem>(
+    `SELECT * FROM transaction_items WHERE transaction_id IN (${placeholders})`,
+    ...ids,
+  );
+
+  const itemsByTx = new Map<number, TransactionItem[]>();
+  for (const item of items) {
+    const list = itemsByTx.get(item.transaction_id);
+    if (list) list.push(item);
+    else itemsByTx.set(item.transaction_id, [item]);
+  }
+
+  return transactions.map((tx) => ({ ...tx, items: itemsByTx.get(tx.id) ?? [] }));
+}
+
 function csvField(value: string | number): string {
   const s = String(value);
   if (/[",\n\r]/.test(s)) {
@@ -124,7 +148,7 @@ function formatCsvDate(createdAt: string): string {
 }
 
 export function buildTransactionsCsv(
-  transactions: Transaction[],
+  transactions: TransactionWithItems[],
   shopName: string,
   date: Date,
 ): string {
@@ -142,10 +166,11 @@ export function buildTransactionsCsv(
     [
       t('export.col_id'),
       t('export.col_date'),
-      t('export.col_total'),
-      t('export.col_paid'),
-      t('export.col_change'),
       t('export.col_method'),
+      t('export.col_product'),
+      t('export.col_qty'),
+      t('export.col_price'),
+      t('export.col_subtotal'),
       t('export.col_notes'),
     ]
       .map(csvField)
@@ -153,19 +178,23 @@ export function buildTransactionsCsv(
   );
 
   for (const tx of transactions) {
-    rows.push(
-      [
-        tx.id,
-        formatCsvDate(tx.created_at),
-        tx.total,
-        tx.amount_paid,
-        tx.change_amount,
-        tx.payment_method,
-        tx.notes ?? '',
-      ]
-        .map(csvField)
-        .join(','),
-    );
+    const txDate = formatCsvDate(tx.created_at);
+    for (const item of tx.items) {
+      rows.push(
+        [
+          tx.id,
+          txDate,
+          tx.payment_method,
+          item.product_name,
+          item.qty,
+          item.price,
+          item.subtotal,
+          tx.notes ?? '',
+        ]
+          .map(csvField)
+          .join(','),
+      );
+    }
   }
 
   // Prepend a UTF-8 BOM so Excel reads non-ASCII text correctly.

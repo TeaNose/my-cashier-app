@@ -1,7 +1,7 @@
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 
-import { buildTransactionsCsv, type Transaction } from '@/db/transactions';
+import { buildTransactionsCsv, getTransactionsWithItemsByDate } from '@/db/transactions';
 import { getShopInfo } from '@/db/settings';
 
 export class ExportError extends Error {
@@ -28,11 +28,11 @@ function toDateStamp(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
-export async function exportTransactionsCsv(
-  transactions: Transaction[],
-  date: Date,
-): Promise<void> {
-  const shopInfo = await getShopInfo();
+export async function exportTransactionsCsv(date: Date): Promise<void> {
+  const [shopInfo, transactions] = await Promise.all([
+    getShopInfo(),
+    getTransactionsWithItemsByDate(date),
+  ]);
   const csv = buildTransactionsCsv(transactions, shopInfo.name, date);
 
   const prefix = sanitizeForFilename(shopInfo.name);
