@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { StyleSheet, FlatList, TouchableOpacity, Modal, Platform, ActivityIndicator } from 'react-native';
+import { StyleSheet, FlatList, TouchableOpacity, Modal, Platform, ActivityIndicator, Alert } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -16,6 +16,7 @@ import { t } from '@/i18n';
 import { getShopInfo, getSavedPrinter, type SavedPrinter } from '@/db/settings';
 import { buildReceipt } from '@/services/receipt';
 import { printReceipt, PrinterError } from '@/services/printer';
+import { exportTransactionsCsv, ExportError } from '@/services/export';
 
 export default function HistoryScreen() {
   const { tint, background, inputBorder } = useTheme();
@@ -28,6 +29,7 @@ export default function HistoryScreen() {
   const [savedPrinter, setSavedPrinter] = useState<SavedPrinter | null>(null);
   const [printStatus, setPrintStatus] = useState<'idle' | 'printing' | 'done' | 'error'>('idle');
   const [printError, setPrintError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     getSavedPrinter().then(setSavedPrinter);
@@ -109,6 +111,19 @@ export default function HistoryScreen() {
     }
   };
 
+  const handleExport = async () => {
+    if (exporting || transactions.length === 0) return;
+    setExporting(true);
+    try {
+      await exportTransactionsCsv(transactions, selectedDate);
+    } catch (e) {
+      const code = e instanceof ExportError ? e.code : 'failed';
+      Alert.alert(t('common.error'), t(`export.${code}` as any));
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const renderTransaction = ({ item }: { item: Transaction }) => (
     <TouchableOpacity
       style={[styles.card, { borderColor: inputBorder }]}
@@ -146,9 +161,27 @@ export default function HistoryScreen() {
           <Text style={styles.dateBtnText}>{formatDayLabel(selectedDate)}</Text>
           <FontAwesome name="caret-down" size={14} color={tint} />
         </TouchableOpacity>
-        <View style={styles.dayTotalRow}>
-          <Text style={styles.dayTotalLabel}>{t('history.tx_count', { count: transactions.length })}</Text>
-          <Text style={[styles.dayTotalValue, { color: tint }]}>{formatPrice(totalForDay)}</Text>
+        <View style={styles.headerRight}>
+          <View style={styles.dayTotalRow}>
+            <Text style={styles.dayTotalLabel}>{t('history.tx_count', { count: transactions.length })}</Text>
+            <Text style={[styles.dayTotalValue, { color: tint }]}>{formatPrice(totalForDay)}</Text>
+          </View>
+          <TouchableOpacity
+            style={[
+              styles.exportBtn,
+              { borderColor: inputBorder, opacity: transactions.length === 0 ? 0.4 : 1 },
+            ]}
+            activeOpacity={0.7}
+            onPress={handleExport}
+            disabled={transactions.length === 0 || exporting}
+            accessibilityLabel={t('export.button')}
+          >
+            {exporting ? (
+              <ActivityIndicator size="small" color={tint} />
+            ) : (
+              <FontAwesome name="share-square-o" size={18} color={tint} />
+            )}
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -286,8 +319,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
   dayTotalRow: {
     alignItems: 'flex-end',
+  },
+  exportBtn: {
+    borderWidth: 1,
+    borderRadius: 10,
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   dayTotalLabel: {
     fontSize: 11,

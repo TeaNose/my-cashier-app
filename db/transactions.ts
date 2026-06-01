@@ -1,4 +1,5 @@
 import { getDatabase } from './database';
+import { t } from '@/i18n';
 
 export type Transaction = {
   id: number;
@@ -100,6 +101,75 @@ export async function getTransactionsByDate(date: Date): Promise<Transaction[]> 
     toSqlUtc(start),
     toSqlUtc(end),
   );
+}
+
+function csvField(value: string | number): string {
+  const s = String(value);
+  if (/[",\n\r]/.test(s)) {
+    return `"${s.replace(/"/g, '""')}"`;
+  }
+  return s;
+}
+
+function formatCsvDate(createdAt: string): string {
+  // created_at is stored in UTC; append 'Z' so it's parsed as UTC, then show local time.
+  const d = new Date(createdAt + 'Z');
+  return d.toLocaleString('id-ID', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+export function buildTransactionsCsv(
+  transactions: Transaction[],
+  shopName: string,
+  date: Date,
+): string {
+  const dateLabel = date.toLocaleDateString('id-ID', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+
+  const rows: string[] = [];
+  rows.push(csvField(shopName || t('export.untitled_shop')));
+  rows.push(csvField(`${t('export.title')} - ${dateLabel}`));
+  rows.push('');
+  rows.push(
+    [
+      t('export.col_id'),
+      t('export.col_date'),
+      t('export.col_total'),
+      t('export.col_paid'),
+      t('export.col_change'),
+      t('export.col_method'),
+      t('export.col_notes'),
+    ]
+      .map(csvField)
+      .join(','),
+  );
+
+  for (const tx of transactions) {
+    rows.push(
+      [
+        tx.id,
+        formatCsvDate(tx.created_at),
+        tx.total,
+        tx.amount_paid,
+        tx.change_amount,
+        tx.payment_method,
+        tx.notes ?? '',
+      ]
+        .map(csvField)
+        .join(','),
+    );
+  }
+
+  // Prepend a UTF-8 BOM so Excel reads non-ASCII text correctly.
+  return '﻿' + rows.join('\r\n') + '\r\n';
 }
 
 export async function getTransactionWithItems(id: number): Promise<TransactionWithItems | null> {
