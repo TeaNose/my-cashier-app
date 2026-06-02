@@ -14,7 +14,7 @@ import { Text, View } from '@/components/Themed';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { useTheme } from '@/hooks/useTheme';
 import { createTransaction, type CartItem } from '@/db/transactions';
-import { requestCartClear } from './(tabs)/cashier';
+import { requestCartClear } from './(tabs)/index';
 import { t } from '@/i18n';
 import { getShopInfo, getSavedPrinter, type SavedPrinter } from '@/db/settings';
 import { buildReceipt } from '@/services/receipt';

@@ -17,14 +17,14 @@ export default function TabLayout() {
   return (
     <Tabs screenOptions={{ tabBarActiveTintColor: tint }}>
       <Tabs.Screen
-        name="cashier"
+        name="index"
         options={{
           title: t('tabs.cashier'),
           tabBarIcon: ({ color }) => <TabBarIcon name="calculator" color={color} />,
         }}
       />
       <Tabs.Screen
-        name="index"
+        name="products"
         options={{
           title: t('tabs.products'),
           tabBarIcon: ({ color }) => <TabBarIcon name="cube" color={color} />,
