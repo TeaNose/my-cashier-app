@@ -1,4 +1,5 @@
 import { getDatabase } from './database';
+import type { ProductExportRow } from '@/services/products-csv';
 
 export type Product = {
   id: number;
@@ -86,4 +87,14 @@ export async function updateProduct(id: number, input: CreateProductInput): Prom
 export async function deleteProduct(id: number): Promise<void> {
   const db = await getDatabase();
   await db.runAsync('DELETE FROM products WHERE id = ?', id);
+}
+
+export async function getProductsForExport(): Promise<ProductExportRow[]> {
+  const db = await getDatabase();
+  return db.getAllAsync<ProductExportRow>(
+    `SELECT p.*, c.name AS category_name
+     FROM products p
+     LEFT JOIN categories c ON c.id = p.category_id
+     ORDER BY p.name ASC`,
+  );
 }

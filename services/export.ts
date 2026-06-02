@@ -4,6 +4,8 @@ import * as Sharing from 'expo-sharing';
 import { Platform } from 'react-native';
 
 import { buildTransactionsCsv, getTransactionsWithItemsByDate } from '@/db/transactions';
+import { getProductsForExport } from '@/db/products';
+import { buildProductsCsv } from '@/services/products-csv';
 import { getShopInfo } from '@/db/settings';
 
 export class ExportError extends Error {
@@ -91,6 +93,23 @@ export async function exportTransactionsCsv(
 
   const prefix = sanitizeForFilename(shopInfo.name);
   const filename = `${prefix ? prefix + '-' : ''}transactions-${toDateStamp(date)}.csv`;
+
+  try {
+    return mode === 'download'
+      ? await downloadCsv(csv, filename)
+      : await shareCsv(csv, filename);
+  } catch (e) {
+    if (e instanceof ExportError) throw e;
+    throw new ExportError('failed');
+  }
+}
+
+export async function exportProductsCsv(mode: ExportMode): Promise<ExportResult> {
+  const [shopInfo, products] = await Promise.all([getShopInfo(), getProductsForExport()]);
+  const csv = buildProductsCsv(products, shopInfo.name);
+
+  const prefix = sanitizeForFilename(shopInfo.name);
+  const filename = `${prefix ? prefix + '-' : ''}products-${toDateStamp(new Date())}.csv`;
 
   try {
     return mode === 'download'
