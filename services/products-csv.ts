@@ -234,3 +234,17 @@ export function parseProductsCsv(text: string): { rows: ParsedProductRow[]; skip
 
   return { rows, skipped };
 }
+
+// Match an imported row to an existing product: by non-blank SKU first
+// (case-insensitive), then by name (case-insensitive). Returns the matched
+// product id, or null if the row should be inserted as new.
+export function matchExistingId(row: ParsedProductRow, existing: ExistingProduct[]): number | null {
+  if (row.sku) {
+    const sku = row.sku.toLowerCase();
+    const bySku = existing.find((p) => p.sku && p.sku.toLowerCase() === sku);
+    if (bySku) return bySku.id;
+  }
+  const name = row.name.toLowerCase();
+  const byName = existing.find((p) => p.name.toLowerCase() === name);
+  return byName ? byName.id : null;
+}
