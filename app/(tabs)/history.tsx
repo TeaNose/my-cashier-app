@@ -16,7 +16,7 @@ import { t } from '@/i18n';
 import { getShopInfo, getSavedPrinter, type SavedPrinter } from '@/db/settings';
 import { buildReceipt } from '@/services/receipt';
 import { printReceipt, PrinterError } from '@/services/printer';
-import { exportTransactionsCsv, ExportError } from '@/services/export';
+import { exportTransactionsCsv, ExportError, type ExportMode } from '@/services/export';
 
 export default function HistoryScreen() {
   const { tint, background, inputBorder } = useTheme();
@@ -111,17 +111,28 @@ export default function HistoryScreen() {
     }
   };
 
-  const handleExport = async () => {
-    if (exporting || transactions.length === 0) return;
+  const runExport = async (mode: ExportMode) => {
     setExporting(true);
     try {
-      await exportTransactionsCsv(selectedDate);
+      const result = await exportTransactionsCsv(selectedDate, mode);
+      if (result.method === 'saved') {
+        Alert.alert(t('common.success'), t('export.saved'));
+      }
     } catch (e) {
       const code = e instanceof ExportError ? e.code : 'failed';
       Alert.alert(t('common.error'), t(`export.${code}` as any));
     } finally {
       setExporting(false);
     }
+  };
+
+  const handleExport = () => {
+    if (exporting || transactions.length === 0) return;
+    Alert.alert(t('export.choose_title'), t('export.choose_message'), [
+      { text: t('export.download'), onPress: () => runExport('download') },
+      { text: t('export.share'), onPress: () => runExport('share') },
+      { text: t('common.cancel'), style: 'cancel' },
+    ]);
   };
 
   const renderTransaction = ({ item }: { item: Transaction }) => (

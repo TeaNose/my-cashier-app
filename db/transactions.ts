@@ -19,6 +19,9 @@ export type TransactionItem = {
   price: number;
   qty: number;
   subtotal: number;
+  // Current buy price of the linked product, joined in for reporting/export.
+  // Null when the product no longer exists.
+  buy_price?: number | null;
 };
 
 export type CartItem = {
@@ -113,7 +116,10 @@ export async function getTransactionsWithItemsByDate(
   const ids = transactions.map((tx) => tx.id);
   const placeholders = ids.map(() => '?').join(',');
   const items = await db.getAllAsync<TransactionItem>(
-    `SELECT * FROM transaction_items WHERE transaction_id IN (${placeholders})`,
+    `SELECT ti.*, p.buy_price AS buy_price
+     FROM transaction_items ti
+     LEFT JOIN products p ON p.id = ti.product_id
+     WHERE ti.transaction_id IN (${placeholders})`,
     ...ids,
   );
 
@@ -169,17 +175,26 @@ export function buildTransactionsCsv(
       t('export.col_method'),
       t('export.col_product'),
       t('export.col_qty'),
-      t('export.col_price'),
+      t('export.col_buy_price'),
+      t('export.col_sell_price'),
       t('export.col_subtotal'),
+      t('export.col_profit'),
       t('export.col_notes'),
     ]
       .map(csvField)
       .join(','),
   );
 
+  let totalSubtotal = 0;
+  let totalProfit = 0;
+
   for (const tx of transactions) {
     const txDate = formatCsvDate(tx.created_at);
     for (const item of tx.items) {
+      const buyPrice = item.buy_price ?? 0;
+      const profit = item.subtotal - buyPrice * item.qty;
+      totalSubtotal += item.subtotal;
+      totalProfit += profit;
       rows.push(
         [
           tx.id,
@@ -187,8 +202,10 @@ export function buildTransactionsCsv(
           tx.payment_method,
           item.product_name,
           item.qty,
+          buyPrice,
           item.price,
           item.subtotal,
+          profit,
           tx.notes ?? '',
         ]
           .map(csvField)
@@ -196,6 +213,24 @@ export function buildTransactionsCsv(
       );
     }
   }
+
+  // Totals row: sums of Subtotal and Laba, aligned to their columns.
+  rows.push(
+    [
+      t('export.row_total'),
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      totalSubtotal,
+      totalProfit,
+      '',
+    ]
+      .map(csvField)
+      .join(','),
+  );
 
   // Prepend a UTF-8 BOM so Excel reads non-ASCII text correctly.
   return '﻿' + rows.join('\r\n') + '\r\n';

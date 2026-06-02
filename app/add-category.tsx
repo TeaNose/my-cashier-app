@@ -6,8 +6,9 @@ import { View } from '@/components/Themed';
 import { FormInput } from '@/components/FormInput';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { useTheme } from '@/hooks/useTheme';
-import { createCategory } from '@/db/categories';
+import { createCategory, categoryExists } from '@/db/categories';
 import { t } from '@/i18n';
+import { titleCase } from '@/utils/text';
 
 export default function AddCategoryScreen() {
   const { background } = useTheme();
@@ -17,15 +18,21 @@ export default function AddCategoryScreen() {
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
-    if (!name.trim()) {
+    const trimmedName = name.trim();
+    if (!trimmedName) {
       Alert.alert(t('common.validation'), t('categories.name_required'));
       return;
     }
 
     setSaving(true);
     try {
-      await createCategory(name, description);
-      Alert.alert(t('common.success'), t('categories.created', { name }), [
+      if (await categoryExists(trimmedName)) {
+        Alert.alert(t('common.validation'), t('categories.already_exists', { name: titleCase(trimmedName) }));
+        return;
+      }
+
+      await createCategory(trimmedName, description);
+      Alert.alert(t('common.success'), t('categories.created', { name: titleCase(trimmedName) }), [
         { text: t('common.ok'), onPress: () => router.back() },
       ]);
     } catch (error) {

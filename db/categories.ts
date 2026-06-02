@@ -8,11 +8,20 @@ export type Category = {
   updated_at: string;
 };
 
+export async function categoryExists(name: string): Promise<boolean> {
+  const db = await getDatabase();
+  const row = await db.getFirstAsync<{ id: number }>(
+    'SELECT id FROM categories WHERE name = ?',
+    name.trim().toLowerCase(),
+  );
+  return row !== null;
+}
+
 export async function createCategory(name: string, description: string): Promise<Category> {
   const db = await getDatabase();
   const result = await db.runAsync(
     'INSERT INTO categories (name, description) VALUES (?, ?)',
-    name.trim(),
+    name.trim().toLowerCase(),
     description.trim() || null,
   );
   const row = await db.getFirstAsync<Category>(

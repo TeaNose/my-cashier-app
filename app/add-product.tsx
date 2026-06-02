@@ -8,6 +8,7 @@ import {
   Modal,
   StyleSheet,
   Switch,
+  TextInput,
   TouchableOpacity,
 } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
@@ -19,6 +20,7 @@ import { getCategories, type Category } from "@/db/categories";
 import { createProduct } from "@/db/products";
 import { useTheme } from "@/hooks/useTheme";
 import { t } from "@/i18n";
+import { titleCase } from "@/utils/text";
 
 export default function AddProductScreen() {
   const { tint, background } = useTheme();
@@ -40,7 +42,17 @@ export default function AddProductScreen() {
   );
   const [categories, setCategories] = useState<Category[]>([]);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+  const [categorySearch, setCategorySearch] = useState("");
   const [saving, setSaving] = useState(false);
+
+  const filteredCategories = categories.filter((c) =>
+    c.name.toLowerCase().includes(categorySearch.trim().toLowerCase()),
+  );
+
+  const closeCategoryPicker = () => {
+    setShowCategoryPicker(false);
+    setCategorySearch("");
+  };
 
   useEffect(() => {
     getCategories().then(setCategories);
@@ -151,7 +163,7 @@ export default function AddProductScreen() {
             ]}
           >
             {selectedCategory
-              ? selectedCategory.name
+              ? titleCase(selectedCategory.name)
               : t("products.select_category")}
           </Text>
           <Text style={styles.dropdownArrow}>▼</Text>
@@ -161,7 +173,7 @@ export default function AddProductScreen() {
           <TouchableOpacity
             style={styles.modalOverlay}
             activeOpacity={1}
-            onPress={() => setShowCategoryPicker(false)}
+            onPress={closeCategoryPicker}
           >
             <View style={styles.modalContent}>
               <Text style={styles.modalTitle}>
@@ -172,38 +184,60 @@ export default function AddProductScreen() {
                   {t("products.no_categories")}
                 </Text>
               ) : (
-                <FlatList
-                  data={categories}
-                  keyExtractor={(item) => item.id.toString()}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity
-                      style={[
-                        styles.optionRow,
-                        selectedCategory?.id === item.id && {
-                          backgroundColor: tint + "20",
-                        },
-                      ]}
-                      onPress={() => {
-                        setSelectedCategory(item);
-                        setShowCategoryPicker(false);
-                      }}
-                    >
-                      <Text style={styles.optionText}>{item.name}</Text>
-                      {selectedCategory?.id === item.id && (
-                        <Text style={[styles.checkMark, { color: tint }]}>
-                          ✓
-                        </Text>
+                <>
+                  <TextInput
+                    style={[
+                      styles.searchInput,
+                      { borderColor: tint + "40", color: tint },
+                    ]}
+                    value={categorySearch}
+                    onChangeText={setCategorySearch}
+                    placeholder={t("products.search_category_placeholder")}
+                    placeholderTextColor={tint + "80"}
+                    autoCorrect={false}
+                  />
+                  {filteredCategories.length === 0 ? (
+                    <Text style={styles.emptyText}>
+                      {t("products.no_matching_categories")}
+                    </Text>
+                  ) : (
+                    <FlatList
+                      data={filteredCategories}
+                      keyboardShouldPersistTaps="handled"
+                      keyExtractor={(item) => item.id.toString()}
+                      renderItem={({ item }) => (
+                        <TouchableOpacity
+                          style={[
+                            styles.optionRow,
+                            selectedCategory?.id === item.id && {
+                              backgroundColor: tint + "20",
+                            },
+                          ]}
+                          onPress={() => {
+                            setSelectedCategory(item);
+                            closeCategoryPicker();
+                          }}
+                        >
+                          <Text style={styles.optionText}>
+                            {titleCase(item.name)}
+                          </Text>
+                          {selectedCategory?.id === item.id && (
+                            <Text style={[styles.checkMark, { color: tint }]}>
+                              ✓
+                            </Text>
+                          )}
+                        </TouchableOpacity>
                       )}
-                    </TouchableOpacity>
+                    />
                   )}
-                />
+                </>
               )}
               {selectedCategory && (
                 <TouchableOpacity
                   style={styles.clearButton}
                   onPress={() => {
                     setSelectedCategory(null);
-                    setShowCategoryPicker(false);
+                    closeCategoryPicker();
                   }}
                 >
                   <Text style={styles.clearButtonText}>
@@ -377,6 +411,14 @@ const styles = StyleSheet.create({
     textAlign: "center",
     opacity: 0.5,
     paddingVertical: 20,
+  },
+  searchInput: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 15,
+    marginBottom: 10,
   },
   optionRow: {
     flexDirection: "row",
