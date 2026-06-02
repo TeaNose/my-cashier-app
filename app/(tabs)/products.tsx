@@ -1,18 +1,30 @@
 import { useCallback, useState } from 'react';
-import { FlatList, StyleSheet, Alert, TouchableOpacity, TextInput } from 'react-native';
+import {
+  FlatList,
+  StyleSheet,
+  Alert,
+  TouchableOpacity,
+  TextInput,
+  ActivityIndicator,
+} from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 
 import { Text, View } from '@/components/Themed';
 import { EmptyState } from '@/components/EmptyState';
 import { useTheme } from '@/hooks/useTheme';
-import { getProducts, deleteProduct, type Product } from '@/db/products';
+import { getProducts, deleteProduct, importProducts, type Product } from '@/db/products';
+import { exportProductsCsv, ExportError, type ExportMode } from '@/services/export';
+import { pickAndParseProductsCsv, ImportError } from '@/services/import';
+import { type ParsedProductRow } from '@/services/products-csv';
 import { t } from '@/i18n';
 
 export default function ProductsScreen() {
   const { tint, inputBackground, inputBorder, text } = useTheme();
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState('');
+  const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   const loadProducts = useCallback(async () => {
     const data = await getProducts();
@@ -48,6 +60,67 @@ export default function ProductsScreen() {
     ]);
   };
 
+  const runExport = async (mode: ExportMode) => {
+    setExporting(true);
+    try {
+      const result = await exportProductsCsv(mode);
+      if (result.method === 'saved') {
+        Alert.alert(t('common.success'), t('export.saved'));
+      }
+    } catch (e) {
+      const code = e instanceof ExportError ? e.code : 'failed';
+      Alert.alert(t('common.error'), t(`export.${code}` as any));
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleExport = () => {
+    if (exporting || products.length === 0) return;
+    Alert.alert(t('export.choose_title'), t('export.choose_message'), [
+      { text: t('export.download'), onPress: () => runExport('download') },
+      { text: t('export.share'), onPress: () => runExport('share') },
+      { text: t('common.cancel'), style: 'cancel' },
+    ]);
+  };
+
+  const applyImport = async (rows: ParsedProductRow[], skipped: number) => {
+    setImporting(true);
+    try {
+      const { added, updated } = await importProducts(rows);
+      loadProducts();
+      Alert.alert(
+        t('import.result_title'),
+        t('import.result_message', { added, updated, skipped }),
+      );
+    } catch {
+      Alert.alert(t('common.error'), t('import.failed'));
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleImport = async () => {
+    if (importing || exporting) return;
+    setImporting(true);
+    let parsed: { rows: ParsedProductRow[]; skipped: number };
+    try {
+      parsed = await pickAndParseProductsCsv();
+    } catch (e) {
+      if (!(e instanceof ImportError) || e.code !== 'cancelled') {
+        const code = e instanceof ImportError ? e.code : 'failed';
+        Alert.alert(t('common.error'), t(`import.${code}` as any));
+      }
+      return;
+    } finally {
+      setImporting(false);
+    }
+    Alert.alert(t('import.confirm_title'), t('import.confirm_message', { count: parsed.rows.length }), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('import.confirm_action'), onPress: () => applyImport(parsed.rows, parsed.skipped) },
+    ]);
+  };
+
   const formatPrice = (price: number) =>
     price.toLocaleString('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 });
 
@@ -59,6 +132,9 @@ export default function ProductsScreen() {
         subtitle={t('products.empty_subtitle')}
         buttonLabel={t('products.add_button')}
         onPress={() => router.push('/add-product')}
+        secondaryLabel={t('import.button')}
+        secondaryIcon="upload"
+        onSecondaryPress={handleImport}
       />
     );
   }
@@ -85,6 +161,35 @@ export default function ProductsScreen() {
             </TouchableOpacity>
           )}
         </View>
+        <TouchableOpacity
+          style={[styles.exportBtn, { borderColor: inputBorder }]}
+          activeOpacity={0.7}
+          onPress={handleImport}
+          disabled={importing || exporting}
+          accessibilityLabel={t('import.button')}
+        >
+          {importing ? (
+            <ActivityIndicator size="small" color={tint} />
+          ) : (
+            <FontAwesome name="upload" size={18} color={tint} />
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.exportBtn,
+            { borderColor: inputBorder, opacity: products.length === 0 ? 0.4 : 1 },
+          ]}
+          activeOpacity={0.7}
+          onPress={handleExport}
+          disabled={products.length === 0 || exporting}
+          accessibilityLabel={t('export.button')}
+        >
+          {exporting ? (
+            <ActivityIndicator size="small" color={tint} />
+          ) : (
+            <FontAwesome name="share-square-o" size={18} color={tint} />
+          )}
+        </TouchableOpacity>
       </View>
 
       {filtered.length === 0 ? (
@@ -145,11 +250,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
     paddingHorizontal: 16,
     paddingTop: 12,
     paddingBottom: 8,
   },
   searchBox: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
@@ -157,6 +266,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     gap: 8,
+  },
+  exportBtn: {
+    borderWidth: 1,
+    borderRadius: 10,
+    width: 42,
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   searchInput: {
     flex: 1,
