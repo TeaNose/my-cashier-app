@@ -10,9 +10,21 @@ type Props = {
   subtitle: string;
   buttonLabel: string;
   onPress: () => void;
+  secondaryLabel?: string;
+  secondaryIcon?: React.ComponentProps<typeof FontAwesome>['name'];
+  onSecondaryPress?: () => void;
 };
 
-export function EmptyState({ icon, title, subtitle, buttonLabel, onPress }: Props) {
+export function EmptyState({
+  icon,
+  title,
+  subtitle,
+  buttonLabel,
+  onPress,
+  secondaryLabel,
+  secondaryIcon,
+  onSecondaryPress,
+}: Props) {
   const { tint } = useTheme();
 
   return (
@@ -29,6 +41,17 @@ export function EmptyState({ icon, title, subtitle, buttonLabel, onPress }: Prop
         <FontAwesome name="plus" size={16} color="#fff" />
         <RNText style={styles.buttonText}>{buttonLabel}</RNText>
       </TouchableOpacity>
+
+      {secondaryLabel && onSecondaryPress ? (
+        <TouchableOpacity
+          activeOpacity={0.7}
+          style={[styles.secondaryButton, { borderColor: tint }]}
+          onPress={onSecondaryPress}
+        >
+          {secondaryIcon ? <FontAwesome name={secondaryIcon} size={16} color={tint} /> : null}
+          <RNText style={[styles.secondaryButtonText, { color: tint }]}>{secondaryLabel}</RNText>
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 }
@@ -63,6 +86,20 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  secondaryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    marginTop: 12,
+  },
+  secondaryButtonText: {
     fontSize: 16,
     fontWeight: '700',
   },
