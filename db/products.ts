@@ -1,5 +1,10 @@
 import { getDatabase } from './database';
-import type { ProductExportRow } from '@/services/products-csv';
+import {
+  matchExistingId,
+  type ProductExportRow,
+  type ParsedProductRow,
+  type ExistingProduct,
+} from '@/services/products-csv';
 
 export type Product = {
   id: number;
@@ -97,4 +102,85 @@ export async function getProductsForExport(): Promise<ProductExportRow[]> {
      LEFT JOIN categories c ON c.id = p.category_id
      ORDER BY p.name ASC`,
   );
+}
+
+// Add new products and overwrite existing ones (matched by SKU then name).
+// Categories referenced by name are created on demand. Runs in one transaction.
+export async function importProducts(
+  rows: ParsedProductRow[],
+): Promise<{ added: number; updated: number }> {
+  const db = await getDatabase();
+  let added = 0;
+  let updated = 0;
+
+  const existing = await db.getAllAsync<ExistingProduct>('SELECT id, sku, name FROM products');
+  const categories = await db.getAllAsync<{ id: number; name: string }>(
+    'SELECT id, name FROM categories',
+  );
+  // Categories are stored lowercased; key the cache by lowercased name.
+  const catByName = new Map(categories.map((c) => [c.name.toLowerCase(), c.id]));
+
+  await db.withTransactionAsync(async () => {
+    for (const row of rows) {
+      let categoryId: number | null = null;
+      if (row.category) {
+        const key = row.category.trim().toLowerCase();
+        if (key) {
+          const cached = catByName.get(key);
+          if (cached !== undefined) {
+            categoryId = cached;
+          } else {
+            const res = await db.runAsync(
+              'INSERT INTO categories (name, description) VALUES (?, ?)',
+              key,
+              '',
+            );
+            categoryId = res.lastInsertRowId;
+            catByName.set(key, categoryId);
+          }
+        }
+      }
+
+      const matchId = matchExistingId(row, existing);
+      if (matchId !== null) {
+        await db.runAsync(
+          `UPDATE products SET name = ?, sku = ?, barcode = ?, category_id = ?, unit = ?, buy_price = ?, sell_price = ?, stock_qty = ?, min_stock_alert = ?, is_active = ?, updated_at = datetime('now')
+           WHERE id = ?`,
+          row.name,
+          row.sku,
+          row.barcode,
+          categoryId,
+          row.unit,
+          row.buy_price,
+          row.sell_price,
+          row.stock_qty,
+          row.min_stock_alert,
+          row.is_active,
+          matchId,
+        );
+        updated++;
+      } else {
+        const res = await db.runAsync(
+          `INSERT INTO products (name, sku, barcode, category_id, unit, buy_price, sell_price, stock_qty, min_stock_alert, is_active)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          row.name,
+          row.sku,
+          row.barcode,
+          categoryId,
+          row.unit,
+          row.buy_price,
+          row.sell_price,
+          row.stock_qty,
+          row.min_stock_alert,
+          row.is_active,
+        );
+        // Track the insert so a later row with the same SKU/name updates it
+        // instead of inserting a duplicate from the same file.
+        existing.push({ id: res.lastInsertRowId, sku: row.sku, name: row.name });
+        added++;
+      }
+    }
+  });
+
+  return { added, updated };
 }
