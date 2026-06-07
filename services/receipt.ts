@@ -1,5 +1,6 @@
 import type { Transaction, TransactionItem } from '@/db/transactions';
 import type { ShopInfo } from '@/db/settings';
+import { upperCase } from '@/utils/text';
 
 function formatNumber(n: number): string {
   return n.toLocaleString('id-ID');
@@ -59,7 +60,7 @@ export function buildReceipt(
   blocks.push({ kind: 'divider' });
 
   for (const item of items) {
-    for (const line of wrap(item.product_name, RECEIPT_WIDTH)) {
+    for (const line of wrap(upperCase(item.product_name), RECEIPT_WIDTH)) {
       blocks.push({ kind: 'text', text: line, align: 'left' });
     }
     blocks.push({

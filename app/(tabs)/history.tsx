@@ -13,6 +13,7 @@ import {
   type TransactionWithItems,
 } from '@/db/transactions';
 import { t } from '@/i18n';
+import { upperCase } from '@/utils/text';
 import { getShopInfo, getSavedPrinter, type SavedPrinter } from '@/db/settings';
 import { buildReceipt } from '@/services/receipt';
 import { printReceipt, PrinterError } from '@/services/printer';
@@ -243,7 +244,7 @@ export default function HistoryScreen() {
                 {selected.items.map((item) => (
                   <View key={item.id} style={styles.detailRow}>
                     <View style={styles.detailLeft}>
-                      <Text style={styles.detailName}>{item.product_name}</Text>
+                      <Text style={styles.detailName}>{upperCase(item.product_name)}</Text>
                       <Text style={styles.detailQty}>
                         {item.qty} x {formatPrice(item.price)}
                       </Text>

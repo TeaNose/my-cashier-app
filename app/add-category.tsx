@@ -8,7 +8,7 @@ import { PrimaryButton } from '@/components/PrimaryButton';
 import { useTheme } from '@/hooks/useTheme';
 import { createCategory, categoryExists } from '@/db/categories';
 import { t } from '@/i18n';
-import { titleCase } from '@/utils/text';
+import { upperCase } from '@/utils/text';
 
 export default function AddCategoryScreen() {
   const { background } = useTheme();
@@ -27,12 +27,12 @@ export default function AddCategoryScreen() {
     setSaving(true);
     try {
       if (await categoryExists(trimmedName)) {
-        Alert.alert(t('common.validation'), t('categories.already_exists', { name: titleCase(trimmedName) }));
+        Alert.alert(t('common.validation'), t('categories.already_exists', { name: upperCase(trimmedName) }));
         return;
       }
 
       await createCategory(trimmedName, description);
-      Alert.alert(t('common.success'), t('categories.created', { name: titleCase(trimmedName) }), [
+      Alert.alert(t('common.success'), t('categories.created', { name: upperCase(trimmedName) }), [
         { text: t('common.ok'), onPress: () => router.back() },
       ]);
     } catch (error) {

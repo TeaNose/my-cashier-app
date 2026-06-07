@@ -18,6 +18,7 @@ import { exportProductsCsv, ExportError, type ExportMode } from '@/services/expo
 import { pickAndParseProductsCsv, ImportError } from '@/services/import';
 import { type ParsedProductRow } from '@/services/products-csv';
 import { t } from '@/i18n';
+import { upperCase } from '@/utils/text';
 
 export default function ProductsScreen() {
   const { tint, inputBackground, inputBorder, text } = useTheme();
@@ -47,7 +48,7 @@ export default function ProductsScreen() {
     : products;
 
   const handleDelete = (product: Product) => {
-    Alert.alert(t('products.delete_title'), t('products.delete_confirm', { name: product.name }), [
+    Alert.alert(t('products.delete_title'), t('products.delete_confirm', { name: upperCase(product.name) }), [
       { text: t('common.cancel'), style: 'cancel' },
       {
         text: t('common.delete'),
@@ -209,10 +210,10 @@ export default function ProductsScreen() {
                 activeOpacity={0.7}
                 onPress={() => router.push({ pathname: '/edit-product', params: { id: item.id } })}
               >
-                <Text style={styles.name}>{item.name}</Text>
+                <Text style={styles.name}>{upperCase(item.name)}</Text>
                 <Text style={[styles.price, { color: tint }]}>{formatPrice(item.sell_price)}</Text>
                 <View style={styles.metaRow}>
-                  {item.sku ? <Text style={styles.meta}>{t('products.sku_label')}: {item.sku}</Text> : null}
+                  {item.sku ? <Text style={styles.meta}>{t('products.sku_label')}: {upperCase(item.sku)}</Text> : null}
                   <Text style={styles.meta}>{t('products.stock')}: {item.stock_qty}</Text>
                   {item.is_active === 0 && <Text style={styles.inactive}>{t('common.inactive')}</Text>}
                 </View>

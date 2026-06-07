@@ -12,7 +12,7 @@ export async function categoryExists(name: string): Promise<boolean> {
   const db = await getDatabase();
   const row = await db.getFirstAsync<{ id: number }>(
     'SELECT id FROM categories WHERE name = ?',
-    name.trim().toLowerCase(),
+    name.trim().toUpperCase(),
   );
   return row !== null;
 }
@@ -21,7 +21,7 @@ export async function createCategory(name: string, description: string): Promise
   const db = await getDatabase();
   const result = await db.runAsync(
     'INSERT INTO categories (name, description) VALUES (?, ?)',
-    name.trim().toLowerCase(),
+    name.trim().toUpperCase(),
     description.trim() || null,
   );
   const row = await db.getFirstAsync<Category>(

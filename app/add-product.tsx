@@ -17,10 +17,10 @@ import { FormInput } from "@/components/FormInput";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { Text, View } from "@/components/Themed";
 import { getCategories, type Category } from "@/db/categories";
-import { createProduct } from "@/db/products";
+import { createProduct, productNameExists, skuExists } from "@/db/products";
 import { useTheme } from "@/hooks/useTheme";
 import { t } from "@/i18n";
-import { titleCase } from "@/utils/text";
+import { upperCase } from "@/utils/text";
 
 export default function AddProductScreen() {
   const { tint, background } = useTheme();
@@ -68,8 +68,26 @@ export default function AddProductScreen() {
       return;
     }
 
+    const trimmedName = name.trim();
+    const trimmedSku = sku.trim();
+
     setSaving(true);
     try {
+      if (await productNameExists(trimmedName)) {
+        Alert.alert(
+          t("common.validation"),
+          t("products.name_exists", { name: upperCase(trimmedName) }),
+        );
+        return;
+      }
+      if (trimmedSku && (await skuExists(trimmedSku))) {
+        Alert.alert(
+          t("common.validation"),
+          t("products.sku_exists", { sku: upperCase(trimmedSku) }),
+        );
+        return;
+      }
+
       await createProduct({
         name: name.trim(),
         sku: sku.trim() || undefined,
@@ -163,7 +181,7 @@ export default function AddProductScreen() {
             ]}
           >
             {selectedCategory
-              ? titleCase(selectedCategory.name)
+              ? upperCase(selectedCategory.name)
               : t("products.select_category")}
           </Text>
           <Text style={styles.dropdownArrow}>▼</Text>
@@ -219,7 +237,7 @@ export default function AddProductScreen() {
                           }}
                         >
                           <Text style={styles.optionText}>
-                            {titleCase(item.name)}
+                            {upperCase(item.name)}
                           </Text>
                           {selectedCategory?.id === item.id && (
                             <Text style={[styles.checkMark, { color: tint }]}>

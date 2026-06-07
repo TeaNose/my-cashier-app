@@ -1,4 +1,5 @@
 import * as SQLite from 'expo-sqlite';
+import { threeMonthsAgoUtc } from '@/utils/date';
 
 let db: SQLite.SQLiteDatabase | null = null;
 
@@ -62,6 +63,18 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
       value TEXT
     );
   `);
+
+  // Housekeeping on launch: drop transactions older than three months so the
+  // on-device DB stays small. Linked transaction_items cascade automatically.
+  // Wrapped so a cleanup failure never blocks DB initialization / app launch.
+  try {
+    await db.runAsync(
+      'DELETE FROM transactions WHERE created_at < ?',
+      threeMonthsAgoUtc(),
+    );
+  } catch (e) {
+    console.warn('Failed to purge old transactions', e);
+  }
 
   return db;
 }

@@ -10,7 +10,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { useTheme } from '@/hooks/useTheme';
 import { getCategories, deleteCategory, type Category } from '@/db/categories';
 import { t } from '@/i18n';
-import { titleCase } from '@/utils/text';
+import { upperCase } from '@/utils/text';
 
 export default function CategoriesScreen() {
   const { tint } = useTheme();
@@ -28,7 +28,7 @@ export default function CategoriesScreen() {
   );
 
   const handleDelete = (category: Category) => {
-    Alert.alert(t('common.delete'), t('categories.delete_confirm', { name: titleCase(category.name) }), [
+    Alert.alert(t('common.delete'), t('categories.delete_confirm', { name: upperCase(category.name) }), [
       { text: t('common.cancel'), style: 'cancel' },
       {
         text: t('common.delete'),
@@ -62,7 +62,7 @@ export default function CategoriesScreen() {
         renderItem={({ item }) => (
           <View style={styles.row}>
             <View style={styles.rowContent}>
-              <Text style={styles.name}>{titleCase(item.name)}</Text>
+              <Text style={styles.name}>{upperCase(item.name)}</Text>
               {item.description ? (
                 <Text style={styles.description}>{item.description}</Text>
               ) : null}

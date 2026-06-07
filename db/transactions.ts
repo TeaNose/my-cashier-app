@@ -1,4 +1,5 @@
 import { getDatabase } from './database';
+import { threeMonthsAgoUtc } from '@/utils/date';
 import { t } from '@/i18n';
 
 export type Transaction = {
@@ -30,6 +31,27 @@ export type CartItem = {
   price: number;
   qty: number;
 };
+
+// Stable payment method codes stored in the DB. 'cash' is the default.
+export const PAYMENT_METHODS = ['cash', 'qris', 'transfer', 'kasbon'] as const;
+export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
+
+// Human-readable label for a stored payment method code (falls back to the
+// raw code for unknown values, e.g. legacy data).
+export function paymentMethodLabel(code: string): string {
+  switch (code) {
+    case 'cash':
+      return t('checkout.pm_cash');
+    case 'qris':
+      return t('checkout.pm_qris');
+    case 'transfer':
+      return t('checkout.pm_transfer');
+    case 'kasbon':
+      return t('checkout.pm_kasbon');
+    default:
+      return code;
+  }
+}
 
 export type TransactionWithItems = Transaction & {
   items: TransactionItem[];
@@ -82,6 +104,18 @@ export async function createTransaction(
     transactionId,
   );
   return row!;
+}
+
+// Housekeeping: remove transactions older than three months so the on-device
+// DB doesn't grow unbounded. Linked transaction_items are deleted automatically
+// via the ON DELETE CASCADE foreign key. Returns the number of rows removed.
+export async function deleteOldTransactions(now: Date = new Date()): Promise<number> {
+  const db = await getDatabase();
+  const result = await db.runAsync(
+    'DELETE FROM transactions WHERE created_at < ?',
+    threeMonthsAgoUtc(now),
+  );
+  return result.changes;
 }
 
 export async function getTransactions(): Promise<Transaction[]> {
@@ -199,7 +233,7 @@ export function buildTransactionsCsv(
         [
           tx.id,
           txDate,
-          tx.payment_method,
+          paymentMethodLabel(tx.payment_method),
           item.product_name,
           item.qty,
           buyPrice,

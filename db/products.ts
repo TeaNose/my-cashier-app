@@ -40,8 +40,8 @@ export async function createProduct(input: CreateProductInput): Promise<Product>
   const result = await db.runAsync(
     `INSERT INTO products (name, sku, barcode, category_id, unit, buy_price, sell_price, stock_qty, min_stock_alert, is_active)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    input.name.trim(),
-    input.sku?.trim() || null,
+    input.name.trim().toUpperCase(),
+    input.sku?.trim().toUpperCase() || null,
     input.barcode?.trim() || null,
     input.category_id ?? null,
     input.unit?.trim() || null,
@@ -56,6 +56,38 @@ export async function createProduct(input: CreateProductInput): Promise<Product>
     result.lastInsertRowId,
   );
   return row!;
+}
+
+// Names and SKUs are stored uppercased, so duplicate checks compare uppercased
+// values. Pass `excludeId` when editing to ignore the product being edited.
+export async function productNameExists(name: string, excludeId?: number): Promise<boolean> {
+  const value = name.trim().toUpperCase();
+  if (!value) return false;
+  const db = await getDatabase();
+  const row =
+    excludeId !== undefined
+      ? await db.getFirstAsync<{ id: number }>(
+          'SELECT id FROM products WHERE name = ? AND id != ?',
+          value,
+          excludeId,
+        )
+      : await db.getFirstAsync<{ id: number }>('SELECT id FROM products WHERE name = ?', value);
+  return row !== null;
+}
+
+export async function skuExists(sku: string, excludeId?: number): Promise<boolean> {
+  const value = sku.trim().toUpperCase();
+  if (!value) return false;
+  const db = await getDatabase();
+  const row =
+    excludeId !== undefined
+      ? await db.getFirstAsync<{ id: number }>(
+          'SELECT id FROM products WHERE sku = ? AND id != ?',
+          value,
+          excludeId,
+        )
+      : await db.getFirstAsync<{ id: number }>('SELECT id FROM products WHERE sku = ?', value);
+  return row !== null;
 }
 
 export async function getProducts(): Promise<Product[]> {
@@ -73,8 +105,8 @@ export async function updateProduct(id: number, input: CreateProductInput): Prom
   await db.runAsync(
     `UPDATE products SET name = ?, sku = ?, barcode = ?, category_id = ?, unit = ?, buy_price = ?, sell_price = ?, stock_qty = ?, min_stock_alert = ?, is_active = ?, updated_at = datetime('now')
      WHERE id = ?`,
-    input.name.trim(),
-    input.sku?.trim() || null,
+    input.name.trim().toUpperCase(),
+    input.sku?.trim().toUpperCase() || null,
     input.barcode?.trim() || null,
     input.category_id ?? null,
     input.unit?.trim() || null,
@@ -117,14 +149,14 @@ export async function importProducts(
   const categories = await db.getAllAsync<{ id: number; name: string }>(
     'SELECT id, name FROM categories',
   );
-  // Categories are stored lowercased; key the cache by lowercased name.
-  const catByName = new Map(categories.map((c) => [c.name.toLowerCase(), c.id]));
+  // Categories are stored uppercased; key the cache by uppercased name.
+  const catByName = new Map(categories.map((c) => [c.name.toUpperCase(), c.id]));
 
   await db.withTransactionAsync(async () => {
     for (const row of rows) {
       let categoryId: number | null = null;
       if (row.category) {
-        const key = row.category.trim().toLowerCase();
+        const key = row.category.trim().toUpperCase();
         if (key) {
           const cached = catByName.get(key);
           if (cached !== undefined) {
@@ -141,13 +173,17 @@ export async function importProducts(
         }
       }
 
+      // Names and SKUs are stored uppercased.
+      const name = row.name.toUpperCase();
+      const sku = row.sku ? row.sku.toUpperCase() : null;
+
       const matchId = matchExistingId(row, existing);
       if (matchId !== null) {
         await db.runAsync(
           `UPDATE products SET name = ?, sku = ?, barcode = ?, category_id = ?, unit = ?, buy_price = ?, sell_price = ?, stock_qty = ?, min_stock_alert = ?, is_active = ?, updated_at = datetime('now')
            WHERE id = ?`,
-          row.name,
-          row.sku,
+          name,
+          sku,
           row.barcode,
           categoryId,
           row.unit,
@@ -163,8 +199,8 @@ export async function importProducts(
         const res = await db.runAsync(
           `INSERT INTO products (name, sku, barcode, category_id, unit, buy_price, sell_price, stock_qty, min_stock_alert, is_active)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          row.name,
-          row.sku,
+          name,
+          sku,
           row.barcode,
           categoryId,
           row.unit,
@@ -176,7 +212,7 @@ export async function importProducts(
         );
         // Track the insert so a later row with the same SKU/name updates it
         // instead of inserting a duplicate from the same file.
-        existing.push({ id: res.lastInsertRowId, sku: row.sku, name: row.name });
+        existing.push({ id: res.lastInsertRowId, sku, name });
         added++;
       }
     }

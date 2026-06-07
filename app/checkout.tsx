@@ -13,9 +13,15 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { Text, View } from '@/components/Themed';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { useTheme } from '@/hooks/useTheme';
-import { createTransaction, type CartItem } from '@/db/transactions';
+import {
+  createTransaction,
+  paymentMethodLabel,
+  PAYMENT_METHODS,
+  type CartItem,
+} from '@/db/transactions';
 import { requestCartClear } from './(tabs)/index';
 import { t } from '@/i18n';
+import { upperCase } from '@/utils/text';
 import { getShopInfo, getSavedPrinter, type SavedPrinter } from '@/db/settings';
 import { buildReceipt } from '@/services/receipt';
 import { printReceipt, PrinterError } from '@/services/printer';
@@ -30,6 +36,7 @@ export default function CheckoutScreen() {
   const total = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
 
   const [amountPaid, setAmountPaid] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<string>('cash');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [completed, setCompleted] = useState(false);
@@ -74,7 +81,7 @@ export default function CheckoutScreen() {
       const transaction = await createTransaction(
         cart,
         paidNum,
-        'cash',
+        paymentMethod,
         notes || undefined,
       );
       setChangeAmount(transaction.change_amount);
@@ -99,7 +106,7 @@ export default function CheckoutScreen() {
         total,
         amount_paid: paidNum,
         change_amount: changeAmount,
-        payment_method: 'cash',
+        payment_method: paymentMethod,
         notes: notes || null,
         created_at: new Date().toISOString().slice(0, 19).replace('T', ' '),
       };
@@ -194,7 +201,7 @@ export default function CheckoutScreen() {
           <View key={item.product_id} style={styles.summaryRow}>
             <View style={styles.summaryLeft}>
               <Text style={styles.itemName} numberOfLines={1}>
-                {item.product_name}
+                {upperCase(item.product_name)}
               </Text>
               <Text style={styles.itemDetail}>
                 {item.qty} x {formatPrice(item.price)}
@@ -214,6 +221,32 @@ export default function CheckoutScreen() {
 
       {/* Payment */}
       <Text style={styles.sectionTitle}>{t('checkout.payment')}</Text>
+
+      {/* Payment Type */}
+      <Text style={styles.inputLabel}>{t('checkout.payment_type')}</Text>
+      <View style={styles.methodRow}>
+        {PAYMENT_METHODS.map((method) => {
+          const active = paymentMethod === method;
+          return (
+            <TouchableOpacity
+              key={method}
+              style={[
+                styles.methodBtn,
+                {
+                  backgroundColor: active ? tint : inputBackground,
+                  borderColor: active ? tint : inputBorder,
+                },
+              ]}
+              onPress={() => setPaymentMethod(method)}
+            >
+              <Text style={[styles.methodBtnText, { color: active ? '#fff' : text }]}>
+                {paymentMethodLabel(method)}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
       <Text style={styles.inputLabel}>{t('checkout.amount_paid')}</Text>
       <View style={styles.amountInputWrapper}>
         <TextInput
@@ -375,6 +408,22 @@ const styles = StyleSheet.create({
   clearBtn: {
     position: 'absolute',
     right: 12,
+  },
+  methodRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 16,
+  },
+  methodBtn: {
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
+  methodBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
   },
   quickRow: {
     flexDirection: 'row',

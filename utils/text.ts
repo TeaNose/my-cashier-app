@@ -1,8 +1,9 @@
 /**
- * Converts a string to title case, capitalizing the first letter of each word.
- * Useful for displaying values stored in lowercase (e.g. "soft drinks" -> "Soft Drinks").
+ * Converts a string to all uppercase for display.
+ * Safe for null/empty values. Names, SKUs and categories are stored uppercase,
+ * but applying this at display sites also normalizes any legacy mixed-case data.
  */
-export function titleCase(value: string): string {
-  if (!value) return value;
-  return value.replace(/\S+/g, (word) => word.charAt(0).toUpperCase() + word.slice(1));
+export function upperCase(value: string | null | undefined): string {
+  if (!value) return value ?? '';
+  return value.toUpperCase();
 }

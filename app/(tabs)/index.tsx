@@ -15,6 +15,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { getProducts, type Product } from '@/db/products';
 import { type CartItem } from '@/db/transactions';
 import { t } from '@/i18n';
+import { upperCase } from '@/utils/text';
 
 let _shouldClearCart = false;
 export function requestCartClear() {
@@ -145,7 +146,7 @@ export default function CashierScreen() {
 
     if (found) {
       addToCart(found);
-      Alert.alert(t('cashier.added'), t('cashier.added_msg', { name: found.name }));
+      Alert.alert(t('cashier.added'), t('cashier.added_msg', { name: upperCase(found.name) }));
     } else {
       Alert.alert(t('cashier.not_found'), t('cashier.not_found_msg', { code: data }));
     }
@@ -168,7 +169,7 @@ export default function CashierScreen() {
           onPress={() => addToCart(item)}
         >
           <Text style={styles.productName} numberOfLines={1}>
-            {item.name}
+            {upperCase(item.name)}
           </Text>
           <Text style={[styles.productPrice, { color: tint }]}>
             {formatPrice(item.sell_price)}
@@ -285,7 +286,7 @@ export default function CashierScreen() {
                 </TouchableOpacity>
                 <View style={styles.productInfo}>
                   <Text style={styles.productName} numberOfLines={1}>
-                    {item.product_name}
+                    {upperCase(item.product_name)}
                   </Text>
                   <Text style={[styles.productPrice, { color: tint }]}>
                     {formatPrice(item.price)} x {item.qty} = {formatPrice(item.price * item.qty)}
